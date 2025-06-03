@@ -34,6 +34,14 @@
     "collectCoverageFrom": [
       "integration/**/*.ts",
       "!integration/**/*.test.ts"
-    ]
+    ],
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/../backend/src/$1"
+    },
+    "transform": {
+      "^.+\\.ts$": ["ts-jest", {
+        "tsconfig": "tsconfig.json"
+      }]
+    }
   }
 } 
