@@ -23,6 +23,58 @@ import { puppeteerSubmissionService } from '@/services/puppeteerMock';
 const router = Router();
 
 /**
+ * GET /stamps/status?userId={userId}
+ * ユーザーのすべてのスタンプのステータス一覧を取得
+ */
+router.get('/status', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const uid = req.uid!;
+    const { userId } = req.query;
+
+    console.log(`Fetching all stamp statuses for user ${uid}`);
+
+    // クエリパラメータのuserIdが指定されている場合は、権限チェック
+    if (userId && userId !== uid) {
+      res.status(403).json({
+        error: 'Forbidden',
+        message: 'You can only access your own stamp statuses',
+      });
+      return;
+    }
+
+    // Firestoreからユーザーのすべてのスタンプを取得
+    const stampsQuery = await firestore
+      .collection('stamps')
+      .where('userId', '==', uid)
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    const stampStatuses = stampsQuery.docs.map(doc => {
+      const data = doc.data() as StampRecord;
+      return {
+        stampId: doc.id,
+        status: data.status,
+        retryCount: data.retryCount || 0,
+        presetId: data.presetId,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+      };
+    });
+
+    res.status(200).json({
+      userId: uid,
+      stamps: stampStatuses,
+    });
+  } catch (error) {
+    console.error('Failed to fetch all stamp statuses:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch stamp statuses',
+    });
+  }
+});
+
+/**
  * POST /stamps/set-preset
  * スタンプにプリセットを設定
  */

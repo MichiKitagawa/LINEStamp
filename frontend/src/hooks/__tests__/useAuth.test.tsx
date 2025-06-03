@@ -25,7 +25,7 @@ describe('useAuth フック', () => {
   });
 
   it('初期状態でローディング中である', () => {
-    mockOnAuthStateChanged.mockImplementation((auth, callback) => {
+    mockOnAuthStateChanged.mockImplementation((_auth, _callback) => {
       // コールバックを呼ばずにunsubscribe関数を返す
       return jest.fn();
     });
@@ -40,7 +40,7 @@ describe('useAuth フック', () => {
   it('ユーザーがログインしている場合、user が設定される', () => {
     const mockUser = { uid: 'test-uid', email: 'test@example.com' } as User;
 
-    mockOnAuthStateChanged.mockImplementation((auth, callback) => {
+    mockOnAuthStateChanged.mockImplementation((_auth, callback) => {
       // すぐにコールバックを呼ぶ
       if (typeof callback === 'function') {
         callback(mockUser);
@@ -56,7 +56,7 @@ describe('useAuth フック', () => {
   });
 
   it('ユーザーがログアウトしている場合、user が null になる', () => {
-    mockOnAuthStateChanged.mockImplementation((auth, callback) => {
+    mockOnAuthStateChanged.mockImplementation((_auth, callback) => {
       if (typeof callback === 'function') {
         callback(null);
       }
@@ -71,7 +71,7 @@ describe('useAuth フック', () => {
   });
 
   it('signInWithGoogle が成功する', async () => {
-    mockOnAuthStateChanged.mockImplementation((auth, callback) => {
+    mockOnAuthStateChanged.mockImplementation((_auth, callback) => {
       if (typeof callback === 'function') {
         callback(null);
       }
@@ -90,7 +90,7 @@ describe('useAuth フック', () => {
   });
 
   it('signInWithGoogle が失敗した場合、エラーが設定される', async () => {
-    mockOnAuthStateChanged.mockImplementation((auth, callback) => {
+    mockOnAuthStateChanged.mockImplementation((_auth, callback) => {
       if (typeof callback === 'function') {
         callback(null);
       }
@@ -108,7 +108,7 @@ describe('useAuth フック', () => {
   });
 
   it('logout が成功する', async () => {
-    mockOnAuthStateChanged.mockImplementation((auth, callback) => {
+    mockOnAuthStateChanged.mockImplementation((_auth, callback) => {
       if (typeof callback === 'function') {
         callback(null);
       }
@@ -127,7 +127,7 @@ describe('useAuth フック', () => {
   });
 
   it('clearError でエラーがクリアされる', () => {
-    mockOnAuthStateChanged.mockImplementation((auth, callback) => {
+    mockOnAuthStateChanged.mockImplementation((_auth, callback) => {
       if (typeof callback === 'function') {
         callback(null);
       }
