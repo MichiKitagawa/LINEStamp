@@ -12,6 +12,9 @@ dotenv.config();
 // Import routes
 import authRoutes from '@/routes/auth';
 import tokensRoutes from '@/routes/tokens';
+import imagesRoutes from '@/routes/images';
+import presetsRoutes from '@/routes/presets';
+import stampsRoutes from '@/routes/stamps';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -69,6 +72,9 @@ app.get('/api', (_req, res) => {
 // Route handlers
 app.use('/auth', authRoutes);
 app.use('/tokens', tokensRoutes);
+app.use('/images', imagesRoutes);
+app.use('/presets', presetsRoutes);
+app.use('/stamps', stampsRoutes);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
