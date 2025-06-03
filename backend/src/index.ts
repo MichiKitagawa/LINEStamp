@@ -11,6 +11,7 @@ dotenv.config();
 
 // Import routes
 import authRoutes from '@/routes/auth';
+import tokensRoutes from '@/routes/tokens';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -33,6 +34,9 @@ app.use(cors({
     : ['http://localhost:3000'],
   credentials: true,
 }));
+
+// Stripe webhook endpoint needs raw body - must be before json middleware
+app.use('/tokens/webhook/stripe', express.raw({ type: 'application/json' }));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -64,6 +68,7 @@ app.get('/api', (_req, res) => {
 
 // Route handlers
 app.use('/auth', authRoutes);
+app.use('/tokens', tokensRoutes);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

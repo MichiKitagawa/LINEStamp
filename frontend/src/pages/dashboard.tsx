@@ -3,12 +3,14 @@ import { useRouter } from 'next/router';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/utils/apiClient';
 import { UserProfile, SessionResponse } from '@/types/auth';
+import { TokenBalance } from '@/types/tokens';
 
 export default function DashboardPage() {
   const { user, loading: authLoading, logout } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -22,6 +24,15 @@ export default function DashboardPage() {
     }
   }, [user, authLoading, router]);
 
+  useEffect(() => {
+    // 決済成功メッセージの表示
+    if (router.query['payment'] === 'success') {
+      setSuccessMessage('決済が完了しました！トークンが追加されました。');
+      // URLから決済パラメータを削除
+      router.replace('/dashboard', undefined, { shallow: true });
+    }
+  }, [router]);
+
   const fetchUserProfile = async () => {
     try {
       setLoading(true);
@@ -33,6 +44,20 @@ export default function DashboardPage() {
       setError('ユーザー情報の取得に失敗しました。');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTokenBalance = async () => {
+    try {
+      const response = await apiClient.get<TokenBalance>('/tokens/balance');
+      if (userProfile) {
+        setUserProfile({
+          ...userProfile,
+          tokenBalance: response.balance,
+        });
+      }
+    } catch (error) {
+      console.error('トークン残数取得エラー:', error);
     }
   };
 
@@ -55,6 +80,10 @@ export default function DashboardPage() {
       return;
     }
     router.push('/upload');
+  };
+
+  const handleRefreshBalance = () => {
+    fetchTokenBalance();
   };
 
   if (authLoading || loading) {
@@ -115,12 +144,38 @@ export default function DashboardPage() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Success Message */}
+          {successMessage && (
+            <div className="lg:col-span-3 bg-success-50 border border-success-200 text-success-800 px-4 py-3 rounded-lg">
+              <div className="flex justify-between items-center">
+                <span>✅ {successMessage}</span>
+                <button
+                  onClick={() => setSuccessMessage(null)}
+                  className="text-success-600 hover:text-success-800"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Token Balance Card */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">
-                トークン残数
-              </h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-medium text-gray-900">
+                  トークン残数
+                </h2>
+                <button
+                  onClick={handleRefreshBalance}
+                  className="text-gray-400 hover:text-gray-600"
+                  title="残数を更新"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
               <div className="text-center">
                 <div className="text-4xl font-bold text-primary-600 mb-2">
                   {userProfile?.tokenBalance || 0}
