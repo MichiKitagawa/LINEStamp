@@ -1,48 +1,18 @@
-rules_version = '2';
+rules_version='2'
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users collection - ユーザーは自分のドキュメントのみアクセス可能
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Images collection - ユーザーは自分の画像のみアクセス可能
-    match /images/{imageId} {
-      allow read, write: if request.auth != null && 
-        resource.data.userId == request.auth.uid;
-    }
-    
-    // Stamps collection - ユーザーは自分のスタンプのみアクセス可能
-    match /stamps/{stampId} {
-      allow read, write: if request.auth != null && 
-        resource.data.userId == request.auth.uid;
-    }
-    
-    // Token transactions - ユーザーは自分の取引履歴のみ参照可能
-    match /token_transactions/{transactionId} {
-      allow read: if request.auth != null && 
-        resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && 
-        request.resource.data.userId == request.auth.uid;
-    }
-    
-    // Submission attempts - ユーザーは自分の申請履歴のみ参照可能
-    match /submission_attempts/{attemptId} {
-      allow read: if request.auth != null && 
-        resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && 
-        request.resource.data.userId == request.auth.uid;
-    }
-    
-    // Presets collection - 全ユーザーが読み取り可能（管理者のみ書き込み）
-    match /presets/{presetId} {
-      allow read: if request.auth != null;
-      allow write: if false; // 管理者機能実装時に変更
-    }
-    
-    // Admin用の設定（現在は無効）
     match /{document=**} {
-      allow read, write: if false;
+      // This rule allows anyone with your database reference to view, edit,
+      // and delete all data in your database. It is useful for getting
+      // started, but it is configured to expire after 30 days because it
+      // leaves your app open to attackers. At that time, all client
+      // requests to your database will be denied.
+      //
+      // Make sure to write security rules for your app before that time, or
+      // else all client requests to your database will be denied until you
+      // update your rules.
+      allow read, write: if request.time < timestamp.date(2025, 7, 4);
     }
   }
-} 
+}

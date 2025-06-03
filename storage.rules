@@ -1,20 +1,16 @@
 rules_version = '2';
+
+// 認証済みユーザーのみアクセス許可
 service firebase.storage {
   match /b/{bucket}/o {
-    // ユーザーは自分のディレクトリ配下のファイルのみアクセス可能
+    // 認証済みユーザーが自分のファイルにアクセス可能
     match /users/{userId}/{allPaths=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // 共通プリセット画像は全ユーザーが読み取り可能
-    match /presets/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if false; // 管理者のみ書き込み可能
-    }
-    
-    // その他のファイルはアクセス不可
+    // 開発環境では一時的に全許可（後で制限を追加）
     match /{allPaths=**} {
-      allow read, write: if false;
+      allow read, write: if request.auth != null;
     }
   }
-} 
+}

@@ -87,3 +87,5 @@ stripe-fixtures/
 # Package lock conflicts (choose one: npm or yarn)
 # package-lock.json
 # yarn.lock 
+
+line-stamp-gen-dev-firebase-adminsdk-fbsvc-6176d0b1a8.json

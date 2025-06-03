@@ -63,9 +63,17 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-  },
+  // 開発中は手動でサーバーを起動してからテストを実行する前提
+  // webServer: [
+  //   {
+  //     command: 'cd ../backend && npm run dev',
+  //     url: 'http://localhost:3001',
+  //     reuseExistingServer: true, // 開発中は常に既存サーバーを再利用
+  //   },
+  //   {
+  //     command: 'cd ../frontend && npm run dev',
+  //     url: 'http://localhost:3000',
+  //     reuseExistingServer: true, // 開発中は常に既存サーバーを再利用
+  //   }
+  // ],
 }); 

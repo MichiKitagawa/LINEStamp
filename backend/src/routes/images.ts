@@ -25,6 +25,15 @@ router.post(
   validateFiles,
   async (req: Request, res: Response) => {
     try {
+      // Firebase機能が無効な場合のチェック
+      if (!firestore) {
+        res.status(503).json({
+          error: 'Service Unavailable',
+          message: 'Database service is not configured',
+        });
+        return;
+      }
+
       const uid = req.uid!;
       const files = req.files as Express.Multer.File[];
       const stampId = uuidv4();
@@ -60,7 +69,7 @@ router.post(
       // Firestoreトランザクション
       const imageIds: string[] = [];
       
-      await firestore.runTransaction(async (transaction) => {
+      await firestore.runTransaction(async (transaction: any) => {
         // スタンプドキュメントを作成
         const stampData: Omit<StampRecord, 'id'> = {
           userId: uid,

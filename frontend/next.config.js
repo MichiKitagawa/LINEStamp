@@ -30,7 +30,7 @@ const nextConfig = {
   trailingSlash: true,
   output: process.env.BUILD_STANDALONE === 'true' ? 'export' : undefined,
 
-  // セキュリティヘッダー
+  // セキュリティヘッダー（Firebase認証用に調整）
   async headers() {
     return [
       {
@@ -47,6 +47,16 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin',
+          },
+          // Firebase認証のポップアップ認証を許可するため、Cross-Origin-Opener-Policyを調整
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups',
+          },
+          // Cross-Origin-Embedder-Policyも調整
+          {
+            key: 'Cross-Origin-Embedder-Policy',
+            value: 'unsafe-none',
           },
         ],
       },

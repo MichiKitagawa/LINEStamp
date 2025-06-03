@@ -2,12 +2,12 @@ import { test, expect } from '@playwright/test';
 
 test.describe('3.1 認証 → ダッシュボード', () => {
   
-  test('3.1-01 ログインページに「Googleでログイン」ボタンが表示される', async ({ page }) => {
+  test('3.1-01 ログインページに「Google でログイン」ボタンが表示される', async ({ page }) => {
     // ログインページにアクセス
     await page.goto('/login');
     
-    // 「Googleでログイン」ボタンが表示されることを確認
-    const loginButton = page.locator('button:has-text("Googleでログイン")');
+    // 「Google でログイン」ボタンが表示されることを確認
+    const loginButton = page.locator('button', { hasText: 'Google でログイン' });
     await expect(loginButton).toBeVisible();
     
     // ページタイトルの確認
@@ -28,11 +28,11 @@ test.describe('3.1 認証 → ダッシュボード', () => {
       }));
     });
 
-    // 「Googleでログイン」ボタンをクリック
-    await page.click('button:has-text("Googleでログイン")');
+    // 「Google でログイン」ボタンをクリック
+    await page.click('button:has-text("Google でログイン")');
     
-    // ダッシュボードページに遷移することを確認
-    await expect(page).toHaveURL('/dashboard');
+    // ダッシュボードページに遷移することを確認（末尾スラッシュの有無を許容）
+    await expect(page).toHaveURL(/\/dashboard\/?$/);
   });
 
   test('3.1-03 ダッシュボードにユーザー名とトークン残数が表示される', async ({ page }) => {
@@ -54,13 +54,13 @@ test.describe('3.1 認証 → ダッシュボード', () => {
     await expect(page.locator('text=Test User')).toBeVisible();
     
     // トークン残数表示エリアが存在することを確認
-    await expect(page.locator('text=所持トークン')).toBeVisible();
+    await expect(page.locator('text=トークン残数')).toBeVisible();
     
-    // 「トークン購入」ボタンが表示されることを確認
-    await expect(page.locator('button:has-text("トークン購入")').or(page.locator('a:has-text("トークン購入")'))).toBeVisible();
+    // 「トークンを購入」ボタンが表示されることを確認
+    await expect(page.locator('button:has-text("トークンを購入")')).toBeVisible();
     
     // 「スタンプ作成を始める」ボタンが表示されることを確認
-    await expect(page.locator('button:has-text("スタンプ作成を始める")').or(page.locator('a:has-text("スタンプ作成を始める")'))).toBeVisible();
+    await expect(page.locator('button:has-text("スタンプ作成を始める")')).toBeVisible();
   });
 
   test('3.1-04 ログアウトボタン押下でログインページに戻る', async ({ page }) => {
@@ -81,8 +81,8 @@ test.describe('3.1 認証 → ダッシュボード', () => {
     // ログアウトボタンをクリック
     await page.click('button:has-text("ログアウト")');
     
-    // ログインページに遷移することを確認
-    await expect(page).toHaveURL('/login');
+    // ログインページに遷移することを確認（末尾スラッシュの有無を許容）
+    await expect(page).toHaveURL(/\/login\/?$/);
     
     // 認証状態がクリアされることを確認
     const authState = await page.evaluate(() => {
@@ -101,7 +101,7 @@ test.describe('3.1 認証 → ダッシュボード', () => {
     // ダッシュボードに直接アクセス
     await page.goto('/dashboard');
     
-    // ログインページにリダイレクトされることを確認
-    await expect(page).toHaveURL('/login');
+    // ログインページにリダイレクトされることを確認（末尾スラッシュの有無を許容）
+    await expect(page).toHaveURL(/\/login\/?$/);
   });
 }); 

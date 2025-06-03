@@ -116,8 +116,18 @@ describe('GET /auth/session', () => {
     expect(response.status).toBe(200);
     expect(response.body.isAuthenticated).toBe(true);
     expect(response.body.user.uid).toBe(mockUid);
+    expect(response.body.user.displayName).toBe('New User');
+    expect(response.body.user.email).toBe('newuser@example.com');
     expect(response.body.user.tokenBalance).toBe(0);
-    expect(mockDocRef.set).toHaveBeenCalled();
+    expect(mockDocRef.set).toHaveBeenCalledWith({
+      uid: mockUid,
+      displayName: 'New User',
+      email: 'newuser@example.com',
+      photoURL: null,
+      tokenBalance: 0,
+      createdAt: expect.any(String),
+      updatedAt: expect.any(String),
+    });
   });
 
   it('Firebase Auth エラー → HTTP 401 を返す', async () => {

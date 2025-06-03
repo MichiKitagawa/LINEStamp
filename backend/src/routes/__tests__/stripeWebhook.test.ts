@@ -10,25 +10,26 @@ jest.mock('../../utils/firebaseAdmin', () => ({
 }));
 
 // Stripeをモック
-jest.mock('../../utils/stripeClient', () => ({
-  stripe: {
-    checkout: {
-      sessions: {
-        create: jest.fn(),
-      },
-    },
-    webhooks: {
-      constructEvent: jest.fn(),
+const mockStripe = {
+  checkout: {
+    sessions: {
+      create: jest.fn(),
     },
   },
+  webhooks: {
+    constructEvent: jest.fn(),
+  },
+};
+
+jest.mock('../../utils/stripeClient', () => ({
+  stripe: mockStripe,
 }));
 
 import tokensRoutes from '../tokens';
 import { firestore } from '../../utils/firebaseAdmin';
-import { stripe } from '../../utils/stripeClient';
 
 const mockFirestore = firestore as jest.Mocked<typeof firestore>;
-const mockConstructEvent = stripe.webhooks.constructEvent as jest.MockedFunction<typeof stripe.webhooks.constructEvent>;
+const mockConstructEvent = mockStripe.webhooks.constructEvent as jest.MockedFunction<any>;
 
 const app = express();
 // Webhook用にraw bodyを処理
@@ -73,7 +74,7 @@ describe('POST /tokens/webhook/stripe', () => {
     mockConstructEvent.mockReturnValue(mockEvent as any);
 
     // Firestore トランザクションモック
-    mockFirestore.runTransaction.mockImplementation(async (callback) => {
+    mockFirestore.runTransaction.mockImplementation(async (callback: any) => {
       const mockTransaction = {
         get: jest.fn().mockResolvedValue({
           exists: true,

@@ -20,6 +20,15 @@ interface UserProfile {
  */
 router.get('/session', verifyIdToken, async (req: Request, res: Response) => {
   try {
+    // Firebase機能が無効な場合のチェック
+    if (!auth || !firestore) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Firebase authentication service is not configured',
+      });
+      return;
+    }
+
     const uid = req.uid!;
     
     // Firebase Auth からユーザー情報を取得

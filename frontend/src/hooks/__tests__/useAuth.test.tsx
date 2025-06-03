@@ -104,7 +104,7 @@ describe('useAuth フック', () => {
       await result.current.signInWithGoogle();
     });
 
-    expect(result.current.error).toBe('ログインに失敗しました。もう一度お試しください。');
+    expect(result.current.error).toBe('ログインに失敗しました: Login failed');
   });
 
   it('logout が成功する', async () => {

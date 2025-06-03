@@ -30,7 +30,7 @@ export const uploadFileToStorage = async (
   });
 
   return new Promise((resolve, reject) => {
-    stream.on('error', (error) => {
+    stream.on('error', (error: Error) => {
       console.error('Storage upload error:', error);
       reject(new Error('Failed to upload file to storage'));
     });

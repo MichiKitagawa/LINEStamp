@@ -17,7 +17,7 @@ import presetsRoutes from '@/routes/presets';
 import stampsRoutes from '@/routes/stamps';
 
 const app = express();
-const PORT = process.env.PORT ?? 3001;
+const PORT = process.env['PORT'] ?? 3001;
 
 // Security middleware
 app.use(helmet());
@@ -32,7 +32,7 @@ app.use(limiter);
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
+  origin: process.env['NODE_ENV'] === 'production' 
     ? ['https://your-frontend-domain.com'] 
     : ['http://localhost:3000'],
   credentials: true,
@@ -49,14 +49,14 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(compression());
 
 // Logging middleware
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+app.use(morgan(process.env['NODE_ENV'] === 'production' ? 'combined' : 'dev'));
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
   res.status(200).json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV ?? 'development',
+    environment: process.env['NODE_ENV'] ?? 'development',
   });
 });
 
@@ -81,7 +81,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   console.error('Error:', err);
   res.status(500).json({
     error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : err.message,
+    message: process.env['NODE_ENV'] === 'production' ? 'Something went wrong' : err.message,
   });
 });
 
@@ -96,7 +96,7 @@ app.use((_req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📍 Environment: ${process.env.NODE_ENV ?? 'development'}`);
+  console.log(`📍 Environment: ${process.env['NODE_ENV'] ?? 'development'}`);
   console.log(`🌐 Health check: http://localhost:${PORT}/health`);
 });
 

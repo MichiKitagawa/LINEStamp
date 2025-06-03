@@ -72,7 +72,7 @@ describe('プリセット設定 API', () => {
         doc: jest.fn().mockReturnValue({}),
       } as any);
 
-      mockFirestore.runTransaction.mockImplementation(async (callback) => {
+      mockFirestore.runTransaction.mockImplementation(async (callback: any) => {
         await callback({
           get: mockTransactionGet,
           update: mockTransactionUpdate,
@@ -128,7 +128,7 @@ describe('プリセット設定 API', () => {
         doc: jest.fn().mockReturnValue({}),
       } as any);
 
-      mockFirestore.runTransaction.mockImplementation(async (callback) => {
+      mockFirestore.runTransaction.mockImplementation(async (callback: any) => {
         try {
           await callback({
             get: mockTransactionGet,
@@ -180,7 +180,7 @@ describe('プリセット設定 API', () => {
         doc: jest.fn().mockReturnValue({}),
       } as any);
 
-      mockFirestore.runTransaction.mockImplementation(async (callback) => {
+      mockFirestore.runTransaction.mockImplementation(async (callback: any) => {
         try {
           await callback({
             get: mockTransactionGet,
@@ -217,7 +217,7 @@ describe('プリセット設定 API', () => {
         doc: jest.fn().mockReturnValue({}),
       } as any);
 
-      mockFirestore.runTransaction.mockImplementation(async (callback) => {
+      mockFirestore.runTransaction.mockImplementation(async (callback: any) => {
         try {
           await callback({
             get: mockTransactionGet,

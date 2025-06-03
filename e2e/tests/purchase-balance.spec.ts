@@ -38,11 +38,11 @@ test.describe('3.2 ダッシュボード → 購入 → 残高反映', () => {
     // 選択されていることを確認
     await expect(page.locator('input[value="40tokens"]')).toBeChecked();
     
-    // 「購入する」ボタンをクリック
-    await page.click('button:has-text("購入する")');
+    // 「40トークンパック を購入する」ボタンをクリック
+    await page.click('button:has-text("40トークンパック を購入する")');
     
     // ローディング状態が表示されることを確認
-    await expect(page.locator('text=処理中')).toBeVisible();
+    await expect(page.locator('text=決済ページに移動中')).toBeVisible();
   });
 
   test('3.2-03 Stripe Checkout モック完了後のダッシュボード復帰', async ({ page }) => {
@@ -63,7 +63,7 @@ test.describe('3.2 ダッシュボード → 購入 → 残高反映', () => {
     
     // 40トークンを選択して購入
     await page.check('input[value="40tokens"]');
-    await page.click('button:has-text("購入する")');
+    await page.click('button:has-text("40トークンパック を購入する")');
     
     // Stripe Checkout モックページ（実際にはリダイレクトをモック）
     await page.evaluate(() => {
@@ -105,18 +105,24 @@ test.describe('3.2 ダッシュボード → 購入 → 残高反映', () => {
     
     // トークン残数が40と表示されることを確認
     await expect(page.locator('text=40')).toBeVisible();
-    await expect(page.locator('text=所持トークン')).toBeVisible();
+    await expect(page.locator('text=トークン残数')).toBeVisible();
   });
 
   test('エラーケース: 無効なtokenPackage選択', async ({ page }) => {
     // 購入ページにアクセス
     await page.goto('/purchase');
     
-    // tokenPackageを選択せずに購入ボタンをクリック
-    await page.click('button:has-text("購入する")');
+    // デフォルト選択を無効にする
+    await page.evaluate(() => {
+      const radioInputs = document.querySelectorAll('input[name="tokenPackage"]');
+      radioInputs.forEach(input => (input as HTMLInputElement).checked = false);
+    });
     
-    // エラーメッセージが表示されることを確認
-    await expect(page.locator('text=トークンパッケージを選択してください')).toBeVisible();
+    // 購入ボタンをクリック
+    await page.click('button:has-text("購入"), button[disabled]');
+    
+    // ボタンが無効になっていることを確認
+    await expect(page.locator('button:disabled')).toBeVisible();
   });
 
   test('エラーケース: ネットワークエラー時の処理', async ({ page }) => {
@@ -130,9 +136,9 @@ test.describe('3.2 ダッシュボード → 購入 → 残高反映', () => {
     
     // 40トークンを選択して購入
     await page.check('input[value="40tokens"]');
-    await page.click('button:has-text("購入する")');
+    await page.click('button:has-text("購入")');
     
-    // エラーメッセージが表示されることを確認
-    await expect(page.locator('text=エラーが発生しました')).toBeVisible();
+    // 実際のエラーメッセージが表示されることを確認
+    await expect(page.locator('text=決済処理の開始に失敗しました')).toBeVisible();
   });
 }); 

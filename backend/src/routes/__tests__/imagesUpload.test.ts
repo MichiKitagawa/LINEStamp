@@ -57,7 +57,7 @@ describe('画像アップロード API', () => {
       } as any);
       
       // トランザクションモックを修正：実際にコールバックを実行する
-      mockFirestore.runTransaction.mockImplementation(async (callback) => {
+      mockFirestore.runTransaction.mockImplementation(async (callback: any) => {
         await callback({
           set: mockTransactionSet,
           update: jest.fn(),
@@ -118,7 +118,7 @@ describe('画像アップロード API', () => {
       } as any);
       
       // トランザクションモックを修正：実際にコールバックを実行する
-      mockFirestore.runTransaction.mockImplementation(async (callback) => {
+      mockFirestore.runTransaction.mockImplementation(async (callback: any) => {
         await callback({
           set: mockTransactionSet,
           update: jest.fn(),
@@ -166,7 +166,7 @@ describe('画像アップロード API', () => {
       mockFirestore.collection.mockReturnValue({
         doc: jest.fn().mockReturnValue({}),
       } as any);
-      mockFirestore.runTransaction.mockImplementation(async (callback) => {
+      mockFirestore.runTransaction.mockImplementation(async (callback: any) => {
         await callback({
           set: mockTransactionSet,
           update: mockTransactionUpdate,

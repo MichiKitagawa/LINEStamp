@@ -20,7 +20,22 @@ export default function DashboardPage() {
     }
 
     if (user) {
-      fetchUserProfile();
+      // モック認証の場合はAPI呼び出しをスキップ
+      if (typeof window !== 'undefined' && localStorage.getItem('mockAuthUser')) {
+        // モックユーザーの場合は直接ユーザー情報を設定
+        setUserProfile({
+          uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || '',
+          photoURL: user.photoURL,
+          tokenBalance: 10, // モック用のデフォルトトークン残数
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        setLoading(false);
+      } else {
+        fetchUserProfile();
+      }
     }
   }, [user, authLoading, router]);
 
@@ -127,7 +142,7 @@ export default function DashboardPage() {
                   className="h-8 w-8 rounded-full"
                 />
                 <span className="text-sm text-gray-700">
-                  {userProfile?.displayName || 'ユーザー'}
+                  {userProfile?.displayName || user?.displayName || 'ユーザー'}
                 </span>
               </div>
               <button

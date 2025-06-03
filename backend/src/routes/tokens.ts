@@ -19,6 +19,15 @@ const router = Router();
  */
 router.post('/checkout-session', verifyIdToken, async (req: Request, res: Response) => {
   try {
+    // Stripe機能が無効な場合のチェック
+    if (!stripe) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Payment service is not configured',
+      });
+      return;
+    }
+
     const { tokenPackage } = req.body as CheckoutSessionRequest;
     const uid = req.uid!;
 
@@ -77,6 +86,15 @@ router.post('/checkout-session', verifyIdToken, async (req: Request, res: Respon
  */
 router.get('/balance', verifyIdToken, async (req: Request, res: Response) => {
   try {
+    // Firebase機能が無効な場合のチェック
+    if (!firestore) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database service is not configured',
+      });
+      return;
+    }
+
     const uid = req.uid!;
 
     // Firestore からユーザー情報を取得
@@ -111,8 +129,26 @@ router.get('/balance', verifyIdToken, async (req: Request, res: Response) => {
  */
 router.post('/webhook/stripe', async (req: Request, res: Response) => {
   try {
+    // Firebase機能が無効な場合のチェック
+    if (!firestore) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database service is not configured',
+      });
+      return;
+    }
+
+    // Stripe機能が無効な場合のチェック
+    if (!stripe) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Payment service is not configured',
+      });
+      return;
+    }
+
     const sig = req.headers['stripe-signature'] as string;
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const webhookSecret = process.env['STRIPE_WEBHOOK_SECRET'];
 
     if (!webhookSecret) {
       console.error('STRIPE_WEBHOOK_SECRET is not set');
@@ -162,8 +198,8 @@ router.post('/webhook/stripe', async (req: Request, res: Response) => {
       }
 
       // Firestore トランザクションでトークンを付与
-      await firestore.runTransaction(async (transaction) => {
-        const userRef = firestore.collection('users').doc(userId);
+      await firestore!.runTransaction(async (transaction: any) => {
+        const userRef = firestore!.collection('users').doc(userId);
         const userDoc = await transaction.get(userRef);
 
         if (!userDoc.exists) {
@@ -189,7 +225,7 @@ router.post('/webhook/stripe', async (req: Request, res: Response) => {
           createdAt: new Date().toISOString(),
         };
 
-        const transactionRef = firestore.collection('token_transactions').doc();
+        const transactionRef = firestore!.collection('token_transactions').doc();
         transaction.set(transactionRef, transactionData);
       });
 
@@ -212,6 +248,15 @@ router.post('/webhook/stripe', async (req: Request, res: Response) => {
  */
 router.post('/consume', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Firebase機能が無効な場合のチェック
+    if (!firestore) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database service is not configured',
+      });
+      return;
+    }
+
     const uid = req.uid!;
     const { stampId, amount } = req.body as ConsumeTokensRequest;
 
@@ -227,9 +272,9 @@ router.post('/consume', verifyIdToken, async (req: Request, res: Response): Prom
 
     let remainingBalance = 0;
 
-    await firestore.runTransaction(async (transaction) => {
+    await firestore.runTransaction(async (transaction: any) => {
       // ユーザーの現在のトークン残数を取得
-      const userRef = firestore.collection('users').doc(uid);
+      const userRef = firestore!.collection('users').doc(uid);
       const userDoc = await transaction.get(userRef);
 
       if (!userDoc.exists) {
@@ -259,7 +304,7 @@ router.post('/consume', verifyIdToken, async (req: Request, res: Response): Prom
         createdAt: new Date().toISOString(),
       };
 
-      const transactionRef = firestore.collection('token_transactions').doc();
+      const transactionRef = firestore!.collection('token_transactions').doc();
       transaction.set(transactionRef, transactionData);
     });
 

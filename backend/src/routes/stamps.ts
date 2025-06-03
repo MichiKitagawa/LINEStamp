@@ -28,6 +28,15 @@ const router = Router();
  */
 router.get('/status', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Firebase機能が無効な場合のチェック
+    if (!firestore) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database service is not configured',
+      });
+      return;
+    }
+
     const uid = req.uid!;
     const { userId } = req.query;
 
@@ -49,7 +58,7 @@ router.get('/status', verifyIdToken, async (req: Request, res: Response): Promis
       .orderBy('createdAt', 'desc')
       .get();
 
-    const stampStatuses = stampsQuery.docs.map(doc => {
+    const stampStatuses = stampsQuery.docs.map((doc: any) => {
       const data = doc.data() as StampRecord;
       return {
         stampId: doc.id,
@@ -80,6 +89,17 @@ router.get('/status', verifyIdToken, async (req: Request, res: Response): Promis
  */
 router.post('/set-preset', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Firebase機能が無効な場合のチェック
+    if (!firestore) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database service is not configured',
+      });
+      return;
+    }
+
+    // firestoreを非nullな変数にキャッシュ
+    const db = firestore;
     const uid = req.uid!;
     const { stampId, presetId } = req.body as SetPresetRequest;
 
@@ -93,9 +113,9 @@ router.post('/set-preset', verifyIdToken, async (req: Request, res: Response): P
 
     console.log(`Setting preset ${presetId} for stamp ${stampId}`);
 
-    await firestore.runTransaction(async (transaction) => {
+    await db.runTransaction(async (transaction: any) => {
       // スタンプの存在確認とユーザー権限チェック
-      const stampRef = firestore.collection('stamps').doc(stampId);
+      const stampRef = db.collection('stamps').doc(stampId);
       const stampDoc = await transaction.get(stampRef);
       
       if (!stampDoc.exists) {
@@ -109,7 +129,7 @@ router.post('/set-preset', verifyIdToken, async (req: Request, res: Response): P
       }
 
       // プリセットの存在確認
-      const presetRef = firestore.collection('presets').doc(presetId);
+      const presetRef = db.collection('presets').doc(presetId);
       const presetDoc = await transaction.get(presetRef);
       
       if (!presetDoc.exists) {
@@ -178,6 +198,15 @@ router.post('/set-preset', verifyIdToken, async (req: Request, res: Response): P
  */
 router.get('/:id/status', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Firebase機能が無効な場合のチェック
+    if (!firestore) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database service is not configured',
+      });
+      return;
+    }
+
     const uid = req.uid!;
     const { id: stampId } = req.params;
 
@@ -236,6 +265,17 @@ router.get('/:id/status', verifyIdToken, async (req: Request, res: Response): Pr
  */
 router.post('/generate', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Firebase機能が無効な場合のチェック
+    if (!firestore) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database service is not configured',
+      });
+      return;
+    }
+
+    // firestoreを非nullな変数にキャッシュ
+    const db = firestore;
     const uid = req.uid!;
     const { stampId } = req.body as GenerateStampRequest;
 
@@ -249,9 +289,9 @@ router.post('/generate', verifyIdToken, async (req: Request, res: Response): Pro
 
     console.log(`Starting stamp generation for stamp ${stampId}`);
 
-    await firestore.runTransaction(async (transaction) => {
+    await db.runTransaction(async (transaction: any) => {
       // スタンプの存在確認と権限チェック
-      const stampRef = firestore.collection('stamps').doc(stampId);
+      const stampRef = db.collection('stamps').doc(stampId);
       const stampDoc = await transaction.get(stampRef);
       
       if (!stampDoc.exists) {
@@ -280,14 +320,14 @@ router.post('/generate', verifyIdToken, async (req: Request, res: Response): Pro
     setImmediate(async () => {
       try {
         // オリジナル画像のURLを取得
-        const originalImagesQuery = await firestore
+        const originalImagesQuery = await db
           .collection('images')
           .where('stampId', '==', stampId)
           .where('type', '==', 'original')
           .orderBy('sequence')
           .get();
 
-        const originalImageUrls = originalImagesQuery.docs.map(doc => {
+        const originalImageUrls = originalImagesQuery.docs.map((doc: any) => {
           const data = doc.data() as ImageRecord;
           return data.url;
         });
@@ -296,7 +336,7 @@ router.post('/generate', verifyIdToken, async (req: Request, res: Response): Pro
         await imageGeneratorService.generateStampImages(stampId, originalImageUrls);
 
         // 生成完了後、ステータスを更新
-        await firestore.collection('stamps').doc(stampId).update({
+        await db.collection('stamps').doc(stampId).update({
           status: 'generated',
           updatedAt: new Date().toISOString(),
         });
@@ -306,7 +346,7 @@ router.post('/generate', verifyIdToken, async (req: Request, res: Response): Pro
         console.error(`Stamp generation failed for stamp ${stampId}:`, error);
         
         // 失敗時はステータスをfailedに更新
-        await firestore.collection('stamps').doc(stampId).update({
+        await db.collection('stamps').doc(stampId).update({
           status: 'failed',
           updatedAt: new Date().toISOString(),
         });
@@ -359,6 +399,15 @@ router.post('/generate', verifyIdToken, async (req: Request, res: Response): Pro
  */
 router.get('/:id/preview', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Firebase機能が無効な場合のチェック
+    if (!firestore) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database service is not configured',
+      });
+      return;
+    }
+
     const uid = req.uid!;
     const { id: stampId } = req.params;
 
@@ -401,7 +450,7 @@ router.get('/:id/preview', verifyIdToken, async (req: Request, res: Response): P
       .orderBy('sequence')
       .get();
 
-    const processedImages: ProcessedImage[] = processedImagesQuery.docs.map(doc => {
+    const processedImages: ProcessedImage[] = processedImagesQuery.docs.map((doc: any) => {
       const data = doc.data() as ImageRecord;
       return {
         id: data.id,
@@ -455,6 +504,17 @@ router.get('/:id/preview', verifyIdToken, async (req: Request, res: Response): P
  */
 router.post('/submit', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Firebase機能が無効な場合のチェック
+    if (!firestore) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database service is not configured',
+      });
+      return;
+    }
+
+    // firestoreを非nullな変数にキャッシュ
+    const db = firestore;
     const uid = req.uid!;
     const { stampId } = req.body as SubmitStampRequest;
 
@@ -468,9 +528,9 @@ router.post('/submit', verifyIdToken, async (req: Request, res: Response): Promi
 
     console.log(`Starting stamp submission for stamp ${stampId}`);
 
-    await firestore.runTransaction(async (transaction) => {
+    await db.runTransaction(async (transaction: any) => {
       // スタンプの存在確認と権限チェック
-      const stampRef = firestore.collection('stamps').doc(stampId);
+      const stampRef = db.collection('stamps').doc(stampId);
       const stampDoc = await transaction.get(stampRef);
       
       if (!stampDoc.exists) {
@@ -502,7 +562,7 @@ router.post('/submit', verifyIdToken, async (req: Request, res: Response): Promi
         await puppeteerSubmissionService.submitStamp(stampId);
 
         // 申請完了後、ステータスを更新
-        await firestore.collection('stamps').doc(stampId).update({
+        await db.collection('stamps').doc(stampId).update({
           status: 'submitted',
           updatedAt: new Date().toISOString(),
         });
@@ -512,7 +572,7 @@ router.post('/submit', verifyIdToken, async (req: Request, res: Response): Promi
         console.error(`Stamp submission failed for stamp ${stampId}:`, error);
         
         // 失敗時はステータスをfailedに更新
-        await firestore.collection('stamps').doc(stampId).update({
+        await db.collection('stamps').doc(stampId).update({
           status: 'failed',
           updatedAt: new Date().toISOString(),
         });
@@ -565,6 +625,17 @@ router.post('/submit', verifyIdToken, async (req: Request, res: Response): Promi
  */
 router.post('/retry', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Firebase機能が無効な場合のチェック
+    if (!firestore) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database service is not configured',
+      });
+      return;
+    }
+
+    // firestoreを非nullな変数にキャッシュ
+    const db = firestore;
     const uid = req.uid!;
     const { stampId } = req.body as RetryStampRequest;
 
@@ -580,9 +651,9 @@ router.post('/retry', verifyIdToken, async (req: Request, res: Response): Promis
 
     let currentRetryCount = 0;
 
-    await firestore.runTransaction(async (transaction) => {
+    await db.runTransaction(async (transaction: any) => {
       // スタンプの存在確認と権限チェック
-      const stampRef = firestore.collection('stamps').doc(stampId);
+      const stampRef = db.collection('stamps').doc(stampId);
       const stampDoc = await transaction.get(stampRef);
       
       if (!stampDoc.exists) {
@@ -618,7 +689,7 @@ router.post('/retry', verifyIdToken, async (req: Request, res: Response): Promis
         await puppeteerSubmissionService.submitStamp(stampId);
 
         // 申請完了後、ステータスを更新
-        await firestore.collection('stamps').doc(stampId).update({
+        await db.collection('stamps').doc(stampId).update({
           status: 'submitted',
           updatedAt: new Date().toISOString(),
         });
@@ -631,7 +702,7 @@ router.post('/retry', verifyIdToken, async (req: Request, res: Response): Promis
         // ここではランダムでsession_expiredになる可能性をシミュレート
         const failureStatus = Math.random() < 0.3 ? 'session_expired' : 'failed';
         
-        await firestore.collection('stamps').doc(stampId).update({
+        await db.collection('stamps').doc(stampId).update({
           status: failureStatus,
           updatedAt: new Date().toISOString(),
         });

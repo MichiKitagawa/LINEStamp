@@ -15,6 +15,15 @@ const router = Router();
  */
 router.get('/list', verifyIdToken, async (_req: Request, res: Response): Promise<void> => {
   try {
+    // Firebase機能が無効な場合のチェック
+    if (!firestore) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database service is not configured',
+      });
+      return;
+    }
+
     console.log('Fetching presets list');
 
     const presetsSnapshot = await firestore.collection('presets').get();
@@ -45,7 +54,7 @@ router.get('/list', verifyIdToken, async (_req: Request, res: Response): Promise
       console.log(`Created ${presets.length} default presets`);
     } else {
       // 既存のプリセットを取得
-      presets = presetsSnapshot.docs.map(doc => ({
+      presets = presetsSnapshot.docs.map((doc: any) => ({
         id: doc.id,
         ...doc.data()
       } as Preset));
@@ -80,6 +89,15 @@ router.get('/list', verifyIdToken, async (_req: Request, res: Response): Promise
  */
 router.get('/:id', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Firebase機能が無効な場合のチェック
+    if (!firestore) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database service is not configured',
+      });
+      return;
+    }
+
     const { id } = req.params;
     
     if (!id) {

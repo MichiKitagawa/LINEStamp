@@ -69,7 +69,7 @@ describe('プリセット一覧取得 API', () => {
         data: () => data,
       }));
 
-      mockFirestore.collection.mockReturnValue({
+      mockFirestore!.collection.mockReturnValue({
         get: jest.fn().mockResolvedValue({
           empty: false,
           docs: mockDocs,
@@ -112,7 +112,7 @@ describe('プリセット一覧取得 API', () => {
         commit: jest.fn().mockResolvedValue(undefined),
       };
 
-      mockFirestore.collection.mockReturnValue({
+      mockFirestore!.collection.mockReturnValue({
         get: jest.fn().mockResolvedValue({
           empty: true,
           docs: [],
@@ -120,7 +120,7 @@ describe('プリセット一覧取得 API', () => {
         doc: jest.fn().mockReturnValue({}),
       } as any);
 
-      mockFirestore.batch.mockReturnValue(mockBatch as any);
+      mockFirestore!.batch.mockReturnValue(mockBatch as any);
 
       const response = await request(app)
         .get('/presets/list')
@@ -146,7 +146,7 @@ describe('プリセット一覧取得 API', () => {
 
   describe('エラーハンドリング', () => {
     it('Firestore エラー時に 500 を返す', async () => {
-      mockFirestore.collection.mockReturnValue({
+      mockFirestore!.collection.mockReturnValue({
         get: jest.fn().mockRejectedValue(new Error('Firestore error')),
       } as any);
 
