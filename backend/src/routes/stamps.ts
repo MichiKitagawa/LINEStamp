@@ -10,8 +10,15 @@ import {
 import {
   GenerateStampRequest,
   GenerateStampResponse,
+  PreviewStampResponse,
+  ProcessedImage,
+  SubmitStampRequest,
+  SubmitStampResponse,
+  RetryStampRequest,
+  RetryStampResponse,
 } from '@/types/stamps';
 import { imageGeneratorService } from '@/services/imageGeneratorMock';
+import { puppeteerSubmissionService } from '@/services/puppeteerMock';
 
 const router = Router();
 
@@ -290,6 +297,334 @@ router.post('/generate', verifyIdToken, async (req: Request, res: Response): Pro
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to start stamp generation',
+    });
+  }
+});
+
+/**
+ * GET /stamps/:id/preview
+ * スタンプのプレビュー画像を取得
+ */
+router.get('/:id/preview', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const uid = req.uid!;
+    const { id: stampId } = req.params;
+
+    if (!stampId) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'Stamp ID is required',
+      });
+      return;
+    }
+
+    console.log(`Fetching preview images for stamp ${stampId}`);
+
+    // スタンプの存在確認と権限チェック
+    const stampDoc = await firestore.collection('stamps').doc(stampId).get();
+    
+    if (!stampDoc.exists) {
+      res.status(404).json({
+        error: 'Not Found',
+        message: 'Stamp not found',
+      });
+      return;
+    }
+
+    const stampData = stampDoc.data() as StampRecord;
+    
+    if (stampData.userId !== uid) {
+      res.status(403).json({
+        error: 'Forbidden',
+        message: 'You do not have permission to access this stamp',
+      });
+      return;
+    }
+
+    // 処理済み画像を取得
+    const processedImagesQuery = await firestore
+      .collection('images')
+      .where('stampId', '==', stampId)
+      .where('type', '==', 'processed')
+      .orderBy('sequence')
+      .get();
+
+    const processedImages: ProcessedImage[] = processedImagesQuery.docs.map(doc => {
+      const data = doc.data() as ImageRecord;
+      return {
+        id: data.id,
+        url: data.url,
+        sequence: data.sequence,
+        filename: data.filename,
+      };
+    });
+
+    // メイン画像があれば取得（任意）
+    let mainImage: ProcessedImage | undefined = undefined;
+    const mainImageQuery = await firestore
+      .collection('images')
+      .where('stampId', '==', stampId)
+      .where('type', '==', 'main')
+      .limit(1)
+      .get();
+
+    if (!mainImageQuery.empty) {
+      const mainImageDoc = mainImageQuery.docs[0];
+      if (mainImageDoc) {
+        const mainImageData = mainImageDoc.data() as ImageRecord;
+        mainImage = {
+          id: mainImageData.id,
+          url: mainImageData.url,
+          sequence: mainImageData.sequence,
+          filename: mainImageData.filename,
+        };
+      }
+    }
+
+    const response: PreviewStampResponse = {
+      stampId,
+      processedImages,
+      ...(mainImage && { mainImage }),
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Failed to fetch preview images:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to fetch preview images',
+    });
+  }
+});
+
+/**
+ * POST /stamps/submit
+ * スタンプの申請を開始
+ */
+router.post('/submit', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const uid = req.uid!;
+    const { stampId } = req.body as SubmitStampRequest;
+
+    if (!stampId) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'stampId is required',
+      });
+      return;
+    }
+
+    console.log(`Starting stamp submission for stamp ${stampId}`);
+
+    await firestore.runTransaction(async (transaction) => {
+      // スタンプの存在確認と権限チェック
+      const stampRef = firestore.collection('stamps').doc(stampId);
+      const stampDoc = await transaction.get(stampRef);
+      
+      if (!stampDoc.exists) {
+        throw new Error('Stamp not found');
+      }
+
+      const stampData = stampDoc.data() as StampRecord;
+      
+      if (stampData.userId !== uid) {
+        throw new Error('Unauthorized: This stamp does not belong to the user');
+      }
+
+      // ステータスの検証
+      if (stampData.status !== 'generated') {
+        throw new Error(`Invalid status: ${stampData.status}. Can only submit from generated status.`);
+      }
+
+      // ステータスをsubmittingに更新
+      transaction.update(stampRef, {
+        status: 'submitting',
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    // 非同期でPuppeteer申請処理を開始
+    setImmediate(async () => {
+      try {
+        // モックPuppeteer申請処理を実行
+        await puppeteerSubmissionService.submitStamp(stampId);
+
+        // 申請完了後、ステータスを更新
+        await firestore.collection('stamps').doc(stampId).update({
+          status: 'submitted',
+          updatedAt: new Date().toISOString(),
+        });
+
+        console.log(`Stamp submission completed successfully for stamp ${stampId}`);
+      } catch (error) {
+        console.error(`Stamp submission failed for stamp ${stampId}:`, error);
+        
+        // 失敗時はステータスをfailedに更新
+        await firestore.collection('stamps').doc(stampId).update({
+          status: 'failed',
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    });
+
+    const response: SubmitStampResponse = {
+      stampId,
+      status: 'submitting',
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Failed to start stamp submission:', error);
+    
+    if (error instanceof Error) {
+      if (error.message === 'Stamp not found') {
+        res.status(404).json({
+          error: 'Not Found',
+          message: 'Stamp not found',
+        });
+        return;
+      }
+      if (error.message.includes('Unauthorized')) {
+        res.status(403).json({
+          error: 'Forbidden',
+          message: 'You do not have permission to submit this stamp',
+        });
+        return;
+      }
+      if (error.message.includes('Invalid status')) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: error.message,
+        });
+        return;
+      }
+    }
+
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to start stamp submission',
+    });
+  }
+});
+
+/**
+ * POST /stamps/retry
+ * スタンプの再申請を開始
+ */
+router.post('/retry', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const uid = req.uid!;
+    const { stampId } = req.body as RetryStampRequest;
+
+    if (!stampId) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'stampId is required',
+      });
+      return;
+    }
+
+    console.log(`Starting stamp retry for stamp ${stampId}`);
+
+    let currentRetryCount = 0;
+
+    await firestore.runTransaction(async (transaction) => {
+      // スタンプの存在確認と権限チェック
+      const stampRef = firestore.collection('stamps').doc(stampId);
+      const stampDoc = await transaction.get(stampRef);
+      
+      if (!stampDoc.exists) {
+        throw new Error('Stamp not found');
+      }
+
+      const stampData = stampDoc.data() as StampRecord;
+      
+      if (stampData.userId !== uid) {
+        throw new Error('Unauthorized: This stamp does not belong to the user');
+      }
+
+      // ステータスの検証
+      if (stampData.status !== 'failed') {
+        throw new Error(`Invalid status: ${stampData.status}. Can only retry from failed status.`);
+      }
+
+      // リトライ回数をインクリメント
+      currentRetryCount = (stampData.retryCount || 0) + 1;
+
+      // ステータスをsubmittingに更新し、リトライ回数をインクリメント
+      transaction.update(stampRef, {
+        status: 'submitting',
+        retryCount: currentRetryCount,
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    // 非同期でPuppeteer再申請処理を開始
+    setImmediate(async () => {
+      try {
+        // モックPuppeteer申請処理を実行
+        await puppeteerSubmissionService.submitStamp(stampId);
+
+        // 申請完了後、ステータスを更新
+        await firestore.collection('stamps').doc(stampId).update({
+          status: 'submitted',
+          updatedAt: new Date().toISOString(),
+        });
+
+        console.log(`Stamp retry completed successfully for stamp ${stampId}, retry count: ${currentRetryCount}`);
+      } catch (error) {
+        console.error(`Stamp retry failed for stamp ${stampId}:`, error);
+        
+        // 失敗時はステータスをfailedまたはsession_expiredに更新
+        // ここではランダムでsession_expiredになる可能性をシミュレート
+        const failureStatus = Math.random() < 0.3 ? 'session_expired' : 'failed';
+        
+        await firestore.collection('stamps').doc(stampId).update({
+          status: failureStatus,
+          updatedAt: new Date().toISOString(),
+        });
+
+        console.log(`Stamp retry failed with status: ${failureStatus}`);
+      }
+    });
+
+    const response: RetryStampResponse = {
+      stampId,
+      status: 'submitting',
+      retryCount: currentRetryCount,
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Failed to start stamp retry:', error);
+    
+    if (error instanceof Error) {
+      if (error.message === 'Stamp not found') {
+        res.status(404).json({
+          error: 'Not Found',
+          message: 'Stamp not found',
+        });
+        return;
+      }
+      if (error.message.includes('Unauthorized')) {
+        res.status(403).json({
+          error: 'Forbidden',
+          message: 'You do not have permission to retry this stamp',
+        });
+        return;
+      }
+      if (error.message.includes('Invalid status')) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: error.message,
+        });
+        return;
+      }
+    }
+
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to start stamp retry',
     });
   }
 });
