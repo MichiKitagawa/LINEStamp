@@ -50,13 +50,23 @@ describe('画像アップロード API', () => {
       mockGenerateStoragePath.mockImplementation((path) => `${path.userId}/${path.stampId}/${path.type}/${path.filename}`);
       mockUploadFileToStorage.mockResolvedValue('https://storage.googleapis.com/bucket/file-url');
       
-      const mockDoc = jest.fn();
+      const mockTransactionSet = jest.fn();
       
       mockFirestore.collection.mockReturnValue({
-        doc: mockDoc,
+        doc: jest.fn().mockReturnValue({}),
       } as any);
-      mockDoc.mockReturnValue({});
-      mockFirestore.runTransaction.mockResolvedValue(undefined);
+      
+      // トランザクションモックを修正：実際にコールバックを実行する
+      mockFirestore.runTransaction.mockImplementation(async (callback) => {
+        await callback({
+          set: mockTransactionSet,
+          update: jest.fn(),
+          get: jest.fn(),
+          getAll: jest.fn(),
+          create: jest.fn(),
+          delete: jest.fn(),
+        } as any);
+      });
 
       // テスト用画像ファイルを作成
       const mockFiles = [
@@ -101,10 +111,23 @@ describe('画像アップロード API', () => {
       mockGenerateStoragePath.mockImplementation((path) => `${path.userId}/${path.stampId}/${path.type}/${path.filename}`);
       mockUploadFileToStorage.mockResolvedValue('https://storage.googleapis.com/bucket/file-url');
       
+      const mockTransactionSet = jest.fn();
+      
       mockFirestore.collection.mockReturnValue({
         doc: jest.fn().mockReturnValue({}),
       } as any);
-      mockFirestore.runTransaction.mockResolvedValue(undefined);
+      
+      // トランザクションモックを修正：実際にコールバックを実行する
+      mockFirestore.runTransaction.mockImplementation(async (callback) => {
+        await callback({
+          set: mockTransactionSet,
+          update: jest.fn(),
+          get: jest.fn(),
+          getAll: jest.fn(),
+          create: jest.fn(),
+          delete: jest.fn(),
+        } as any);
+      });
 
       // 8枚のテスト用画像ファイルを作成
       const mockFiles = Array.from({ length: 8 }, (_, i) => ({
