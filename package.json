@@ -1,0 +1,65 @@
+{
+  "name": "line-stamp-generator",
+  "version": "1.0.0",
+  "description": "LINEスタンプ自動生成・申請システム",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "test:e2e": "cd e2e && npm test",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "cd backend && npm run lint",
+    "lint:frontend": "cd frontend && npm run lint",
+    "lint:fix": "npm run lint:fix:backend && npm run lint:fix:frontend",
+    "lint:fix:backend": "cd backend && npm run lint:fix",
+    "lint:fix:frontend": "cd frontend && npm run lint:fix",
+    "emulator": "firebase emulators:start",
+    "deploy:staging": "npm run build && npm run deploy:backend:staging && npm run deploy:frontend:staging",
+    "deploy:prod": "npm run build && npm run deploy:backend:prod && npm run deploy:frontend:prod",
+    "deploy:backend:staging": "cd backend && npm run deploy:staging",
+    "deploy:backend:prod": "cd backend && npm run deploy:prod",
+    "deploy:frontend:staging": "cd frontend && npm run deploy:staging",
+    "deploy:frontend:prod": "cd frontend && npm run deploy:prod",
+    "setup": "npm run setup:backend && npm run setup:frontend && npm run setup:e2e && npm run setup:firebase",
+    "setup:backend": "cd backend && npm install",
+    "setup:frontend": "cd frontend && npm install",
+    "setup:e2e": "cd e2e && npm install",
+    "setup:firebase": "firebase init --project default"
+  },
+  "workspaces": [
+    "backend",
+    "frontend",
+    "e2e"
+  ],
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "firebase-tools": "^13.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MichiKitagawa/LINEStamp.git"
+  },
+  "keywords": [
+    "LINE",
+    "stamp",
+    "generator",
+    "automation",
+    "creators"
+  ],
+  "author": "MichiKitagawa",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/MichiKitagawa/LINEStamp/issues"
+  },
+  "homepage": "https://github.com/MichiKitagawa/LINEStamp#readme"
+} 

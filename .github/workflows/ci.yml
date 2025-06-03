@@ -1,0 +1,164 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  NODE_VERSION: '18.x'
+  CLOUD_RUN_SERVICE_BACKEND_STAGING: 'line-stamp-backend-staging'
+  CLOUD_RUN_SERVICE_BACKEND_PROD: 'line-stamp-backend-prod'
+  CLOUD_RUN_REGION: 'asia-northeast1'
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install root dependencies
+      run: npm ci
+      
+    - name: Install backend dependencies
+      run: cd backend && npm ci
+      
+    - name: Install frontend dependencies
+      run: cd frontend && npm ci
+      
+    - name: Lint backend
+      run: cd backend && npm run lint
+      
+    - name: Lint frontend
+      run: cd frontend && npm run lint
+      
+    - name: Test backend
+      run: cd backend && npm test
+      env:
+        FIRESTORE_EMULATOR_HOST: localhost:8080
+        
+    - name: Test frontend
+      run: cd frontend && npm test
+      
+    - name: Build backend
+      run: cd backend && npm run build
+      
+    - name: Build frontend
+      run: cd frontend && npm run build
+
+  deploy-staging:
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd backend && npm ci
+        cd ../frontend && npm ci
+        
+    - name: Build applications
+      run: |
+        cd backend && npm run build
+        cd ../frontend && npm run build
+        
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY_STAGING }}
+        
+    - name: Setup Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      
+    - name: Configure Docker
+      run: gcloud auth configure-docker
+      
+    - name: Build and push backend Docker image
+      run: |
+        cd backend
+        docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID_STAGING }}/${{ env.CLOUD_RUN_SERVICE_BACKEND_STAGING }}:${{ github.sha }} .
+        docker push gcr.io/${{ secrets.GCP_PROJECT_ID_STAGING }}/${{ env.CLOUD_RUN_SERVICE_BACKEND_STAGING }}:${{ github.sha }}
+        
+    - name: Deploy backend to Cloud Run
+      run: |
+        gcloud run deploy ${{ env.CLOUD_RUN_SERVICE_BACKEND_STAGING }} \
+          --image gcr.io/${{ secrets.GCP_PROJECT_ID_STAGING }}/${{ env.CLOUD_RUN_SERVICE_BACKEND_STAGING }}:${{ github.sha }} \
+          --platform managed \
+          --region ${{ env.CLOUD_RUN_REGION }} \
+          --allow-unauthenticated \
+          --set-env-vars="NODE_ENV=staging" \
+          --memory=512Mi \
+          --project ${{ secrets.GCP_PROJECT_ID_STAGING }}
+
+  deploy-production:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd backend && npm ci
+        cd ../frontend && npm ci
+        
+    - name: Build applications
+      run: |
+        cd backend && npm run build
+        cd ../frontend && npm run build
+        
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY_PROD }}
+        
+    - name: Setup Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      
+    - name: Configure Docker
+      run: gcloud auth configure-docker
+      
+    - name: Build and push backend Docker image
+      run: |
+        cd backend
+        docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID_PROD }}/${{ env.CLOUD_RUN_SERVICE_BACKEND_PROD }}:${{ github.sha }} .
+        docker push gcr.io/${{ secrets.GCP_PROJECT_ID_PROD }}/${{ env.CLOUD_RUN_SERVICE_BACKEND_PROD }}:${{ github.sha }}
+        
+    - name: Deploy backend to Cloud Run
+      run: |
+        gcloud run deploy ${{ env.CLOUD_RUN_SERVICE_BACKEND_PROD }} \
+          --image gcr.io/${{ secrets.GCP_PROJECT_ID_PROD }}/${{ env.CLOUD_RUN_SERVICE_BACKEND_PROD }}:${{ github.sha }} \
+          --platform managed \
+          --region ${{ env.CLOUD_RUN_REGION }} \
+          --allow-unauthenticated \
+          --set-env-vars="NODE_ENV=production" \
+          --memory=1Gi \
+          --project ${{ secrets.GCP_PROJECT_ID_PROD }} 
