@@ -9,6 +9,9 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
+// Import routes
+import authRoutes from '@/routes/auth';
+
 const app = express();
 const PORT = process.env.PORT ?? 3001;
 
@@ -50,7 +53,7 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// API routes will be added here
+// API routes
 app.get('/api', (_req, res) => {
   res.json({
     message: 'LINEスタンプ自動生成システム API',
@@ -58,6 +61,9 @@ app.get('/api', (_req, res) => {
     status: 'running',
   });
 });
+
+// Route handlers
+app.use('/auth', authRoutes);
 
 // Error handling middleware
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
