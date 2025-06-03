@@ -9,6 +9,7 @@ import {
   TOKEN_PACKAGES,
   TokenTransaction,
 } from '@/types/tokens';
+import { ConsumeTokensRequest, ConsumeTokensResponse } from '@/types/stamps';
 
 const router = Router();
 
@@ -201,6 +202,98 @@ router.post('/webhook/stripe', async (req: Request, res: Response) => {
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Failed to process webhook',
+    });
+  }
+});
+
+/**
+ * POST /tokens/consume
+ * トークンを消費
+ */
+router.post('/consume', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const uid = req.uid!;
+    const { stampId, amount } = req.body as ConsumeTokensRequest;
+
+    if (!stampId || !amount || amount <= 0) {
+      res.status(400).json({
+        error: 'Bad Request',
+        message: 'stampId and positive amount are required',
+      });
+      return;
+    }
+
+    console.log(`Consuming ${amount} tokens for user ${uid} and stamp ${stampId}`);
+
+    let remainingBalance = 0;
+
+    await firestore.runTransaction(async (transaction) => {
+      // ユーザーの現在のトークン残数を取得
+      const userRef = firestore.collection('users').doc(uid);
+      const userDoc = await transaction.get(userRef);
+
+      if (!userDoc.exists) {
+        throw new Error('User not found');
+      }
+
+      const userData = userDoc.data()!;
+      const currentBalance = userData['tokenBalance'] || 0;
+
+      if (currentBalance < amount) {
+        throw new Error('Insufficient tokens');
+      }
+
+      // トークンを消費
+      remainingBalance = currentBalance - amount;
+      transaction.update(userRef, {
+        tokenBalance: remainingBalance,
+        updatedAt: new Date().toISOString(),
+      });
+
+      // 消費履歴を保存
+      const transactionData: Omit<TokenTransaction, 'id'> = {
+        userId: uid,
+        type: 'consume',
+        amount: -amount, // 消費は負の値で記録
+        stampId,
+        createdAt: new Date().toISOString(),
+      };
+
+      const transactionRef = firestore.collection('token_transactions').doc();
+      transaction.set(transactionRef, transactionData);
+    });
+
+    console.log(`Tokens consumed successfully: ${uid} -${amount}, remaining: ${remainingBalance}`);
+
+    const response: ConsumeTokensResponse = {
+      success: true,
+      remainingBalance,
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Token consumption error:', error);
+    
+    if (error instanceof Error) {
+      if (error.message === 'User not found') {
+        res.status(404).json({
+          error: 'Not Found',
+          message: 'User not found',
+        });
+        return;
+      }
+      if (error.message === 'Insufficient tokens') {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: 'Insufficient token balance',
+        });
+        return;
+      }
+    }
+
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to consume tokens',
     });
   }
 });

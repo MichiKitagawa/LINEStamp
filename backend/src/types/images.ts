@@ -57,7 +57,7 @@ export interface SetPresetResponse {
 export interface StampRecord {
   id: string;
   userId: string;
-  status: 'pending_upload' | 'generating' | 'generated' | 'submitting' | 'submitted' | 'failed' | 'session_expired';
+  status: 'pending_upload' | 'pending_generate' | 'generating' | 'generated' | 'submitting' | 'submitted' | 'failed' | 'session_expired';
   presetId?: string;
   presetConfig?: PresetConfig;
   retryCount: number;

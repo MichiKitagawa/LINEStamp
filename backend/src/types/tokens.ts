@@ -24,6 +24,7 @@ export interface TokenTransaction {
   type: 'purchase' | 'consume';
   amount: number;
   packageId?: string;
+  stampId?: string;
   stripeSessionId?: string;
   createdAt: string;
 }
