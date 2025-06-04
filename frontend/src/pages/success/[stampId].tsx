@@ -29,7 +29,7 @@ export default function SuccessPage() {
   // スタンプステータスを取得
   const fetchStampStatus = async (stampId: string) => {
     try {
-      const response = await fetch(`/api/stamps/${stampId}/status`, {
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_BASE_URL']}/stamps/${stampId}/status`, {
         headers: {
           'Authorization': `Bearer ${await user?.getIdToken()}`,
         },
@@ -184,6 +184,25 @@ export default function SuccessPage() {
                     申請が受理されるまで数日かかる場合があります。<br />
                     LINE Creators Market からの通知をお待ちください。
                   </p>
+                  
+                  {/* 完了メッセージ */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-blue-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-blue-800">
+                          🎯 申請プロセス完了
+                        </h3>
+                        <p className="text-sm text-blue-700 mt-1">
+                          当アプリでの作業はこれで完了です。スタンプの審査と承認はLINE Creators Marketで行われます。
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* 申請詳細情報 */}
@@ -203,19 +222,33 @@ export default function SuccessPage() {
 
                 {/* アクションボタン */}
                 <div className="space-y-4">
-                  <div className="space-x-4">
-                    <button
-                      onClick={handleCreateNewStamp}
-                      className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      新しいスタンプを作成
-                    </button>
+                  <div className="text-center">
                     <button
                       onClick={handleBackToDashboard}
-                      className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                      className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       ダッシュボードへ戻る
                     </button>
+                  </div>
+                  
+                  {/* 重複申請防止の警告 */}
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <div className="flex items-start">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-orange-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-orange-800">
+                          ⚠️ 重要：重複申請について
+                        </h3>
+                        <p className="text-sm text-orange-700 mt-1">
+                          <strong>新しいスタンプの作成は、現在の申請の結果（承認または却下）が届いてから行ってください。</strong><br />
+                          短期間での重複申請は、アカウントの評価に悪影響を及ぼす可能性があります。
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </>
@@ -236,24 +269,26 @@ export default function SuccessPage() {
                 💡 <strong>次のステップ:</strong><br />
                 • LINE Creators Market からの審査結果通知をお待ちください<br />
                 • 審査には通常1〜7営業日かかります<br />
-                • 承認されると、LINEスタンプショップで販売開始されます
+                • 承認されると、LINEスタンプショップで販売開始されます<br />
+                • 結果が届いてから新しいスタンプの作成を検討してください
               </p>
             </div>
           </div>
         </div>
 
-        {/* 追加情報 */}
-        <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-md p-4">
+        {/* 追加の注意事項 */}
+        <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-4">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-yellow-700">
-                ⚠️ 申請後の変更・キャンセルはできません。
-                新しいバージョンを作成したい場合は、新規スタンプとして申請してください。
+              <p className="text-sm text-red-700">
+                🚫 <strong>重複申請の防止:</strong><br />
+                申請後の変更・キャンセルはできません。同じ内容での重複申請は避けてください。<br />
+                新しいバージョンを作成したい場合は、<strong>必ず審査結果を待ってから</strong>新規スタンプとして申請してください。
               </p>
             </div>
           </div>

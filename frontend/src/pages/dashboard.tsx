@@ -7,11 +7,13 @@ import { TokenBalance } from '@/types/tokens';
 
 export default function DashboardPage() {
   const { user, loading: authLoading, logout } = useAuth();
+  const router = useRouter();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const router = useRouter();
+  const [pendingStamps, setPendingStamps] = useState<any[]>([]);
+  const [hasPendingSubmission, setHasPendingSubmission] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -33,8 +35,11 @@ export default function DashboardPage() {
           updatedAt: new Date().toISOString(),
         });
         setLoading(false);
+        // モックユーザーでもスタンプ状況は確認
+        fetchUserStamps();
       } else {
         fetchUserProfile();
+        fetchUserStamps();
       }
     }
   }, [user, authLoading, router]);
@@ -59,6 +64,22 @@ export default function DashboardPage() {
       setError('ユーザー情報の取得に失敗しました。');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchUserStamps = async () => {
+    try {
+      const response = await apiClient.get<{ userId: string; stamps: any[] }>('/stamps/status');
+      const stamps = response.stamps || [];
+      setPendingStamps(stamps);
+      
+      // 申請中・申請済みのスタンプがあるかチェック
+      const hasActivSubmission = stamps.some((stamp: any) => 
+        stamp.status === 'submitting' || stamp.status === 'submitted'
+      );
+      setHasPendingSubmission(hasActivSubmission);
+    } catch (error) {
+      console.error('スタンプ一覧取得エラー:', error);
     }
   };
 
@@ -94,11 +115,18 @@ export default function DashboardPage() {
       router.push('/purchase');
       return;
     }
+    
+    // 申請中・申請済みのスタンプがある場合は警告
+    if (hasPendingSubmission) {
+      return;
+    }
+    
     router.push('/upload');
   };
 
   const handleRefreshBalance = () => {
     fetchTokenBalance();
+    fetchUserStamps(); // スタンプ状況も更新
   };
 
   if (authLoading || loading) {
@@ -216,6 +244,30 @@ export default function DashboardPage() {
                 <h2 className="text-lg font-medium text-gray-900 mb-4">
                   スタンプ作成
                 </h2>
+                
+                {/* 申請中・申請済みスタンプがある場合の警告 */}
+                {hasPendingSubmission && (
+                  <div className="mb-6 bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-orange-800">
+                          ⚠️ 申請待ちのスタンプがあります
+                        </h3>
+                        <p className="text-sm text-orange-700 mt-1">
+                          現在申請中または審査待ちのスタンプがあります。<br />
+                          <strong>新しいスタンプの作成は、審査結果が届いてから行ってください。</strong><br />
+                          重複申請は推奨されません。
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-600 mb-2">
@@ -227,14 +279,17 @@ export default function DashboardPage() {
                   </div>
                   <button
                     onClick={handleCreateStamp}
-                    disabled={!userProfile || userProfile.tokenBalance < 5}
+                    disabled={!userProfile || userProfile.tokenBalance < 5 || hasPendingSubmission}
                     className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                   >
                     {!userProfile || userProfile.tokenBalance < 5
                       ? 'トークン不足'
+                      : hasPendingSubmission
+                      ? '申請待ちあり'
                       : 'スタンプ作成を始める'}
                   </button>
                 </div>
+                
                 {!userProfile || userProfile.tokenBalance < 5 ? (
                   <div className="mt-4 p-3 bg-warning-50 border border-warning-200 rounded-lg">
                     <p className="text-sm text-warning-800">
@@ -296,6 +351,71 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Pending Stamps Status */}
+              {pendingStamps.length > 0 && (
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h2 className="text-lg font-medium text-gray-900 mb-4">
+                    スタンプ申請状況
+                  </h2>
+                  <div className="space-y-3">
+                    {pendingStamps
+                      .filter((stamp: any) => 
+                        stamp.status === 'submitting' || 
+                        stamp.status === 'submitted' || 
+                        stamp.status === 'failed' ||
+                        stamp.status === 'session_expired'
+                      )
+                      .slice(0, 5) // 最新5件まで表示
+                      .map((stamp: any) => (
+                        <div 
+                          key={stamp.stampId}
+                          className={`flex items-center justify-between p-3 border rounded-lg ${
+                            stamp.status === 'submitted' 
+                              ? 'border-green-200 bg-green-50' 
+                              : stamp.status === 'submitting'
+                              ? 'border-blue-200 bg-blue-50'
+                              : 'border-red-200 bg-red-50'
+                          }`}
+                        >
+                          <div className="flex items-center">
+                            <div className={`w-3 h-3 rounded-full mr-3 ${
+                              stamp.status === 'submitted' 
+                                ? 'bg-green-500' 
+                                : stamp.status === 'submitting'
+                                ? 'bg-blue-500 animate-pulse'
+                                : 'bg-red-500'
+                            }`}></div>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">
+                                スタンプID: {stamp.stampId.slice(0, 8)}...
+                              </p>
+                              <p className="text-xs text-gray-600">
+                                {stamp.status === 'submitted' && '申請完了 - 審査待ち'}
+                                {stamp.status === 'submitting' && '申請中...'}
+                                {stamp.status === 'failed' && '申請失敗'}
+                                {stamp.status === 'session_expired' && 'セッション期限切れ'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {new Date(stamp.updatedAt).toLocaleDateString('ja-JP')}
+                          </div>
+                        </div>
+                      ))
+                    }
+                  </div>
+                  {pendingStamps.filter((stamp: any) => 
+                    stamp.status === 'submitting' || stamp.status === 'submitted'
+                  ).length > 0 && (
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-700">
+                        💡 審査結果はLINE Creators Marketから通知されます。通常1〜7営業日かかります。
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

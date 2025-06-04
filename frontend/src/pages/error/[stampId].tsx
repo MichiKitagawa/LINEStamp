@@ -38,7 +38,7 @@ export default function ErrorPage() {
   // スタンプステータスを取得
   const fetchStampStatus = async (stampId: string) => {
     try {
-      const response = await fetch(`/api/stamps/${stampId}/status`, {
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_BASE_URL']}/stamps/${stampId}/status`, {
         headers: {
           'Authorization': `Bearer ${await user?.getIdToken()}`,
         },
@@ -74,7 +74,7 @@ export default function ErrorPage() {
     setState(prev => ({ ...prev, status: 'retrying' }));
 
     try {
-      const response = await fetch('/api/stamps/retry', {
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_BASE_URL']}/stamps/retry`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
