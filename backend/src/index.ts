@@ -30,13 +30,33 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// CORS configuration
-app.use(cors({
-  origin: process.env['NODE_ENV'] === 'production' 
-    ? ['https://your-frontend-domain.com'] 
-    : ['http://localhost:3000'],
-  credentials: true,
-}));
+// CORS configuration - DEVELOPMENT ONLY
+if (process.env['NODE_ENV'] !== 'production') {
+  // 開発環境用：より寛容なCORS設定
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    
+    // プリフライトリクエストの処理
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(200);
+      return;
+    }
+    
+    next();
+  });
+} else {
+  // 本番環境用：セキュアなCORS設定
+  app.use(cors({
+    origin: ['https://your-frontend-domain.com'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    preflightContinue: false,
+    optionsSuccessStatus: 200
+  }));
+}
 
 // Stripe webhook endpoint needs raw body - must be before json middleware
 app.use('/tokens/webhook/stripe', express.raw({ type: 'application/json' }));

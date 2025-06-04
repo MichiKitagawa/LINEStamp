@@ -151,6 +151,71 @@ router.post('/set-preset', verifyIdToken, async (req: Request, res: Response): P
 
     console.log(`Successfully set preset ${presetId} for stamp ${stampId}`);
 
+    // プリセット選択後、非同期でトークン消費と生成処理を開始
+    setImmediate(async () => {
+      try {
+        console.log(`Starting automatic generation process for stamp ${stampId}`);
+        
+        // 1. トークンを消費
+        const requiredTokens = 8 * 5; // 8枚 × 5トークン
+        
+        const userRef = db.collection('users').doc(uid);
+        await db.runTransaction(async (transaction: any) => {
+          const userDoc = await transaction.get(userRef);
+          if (!userDoc.exists) {
+            throw new Error('User not found');
+          }
+          
+          const userData = userDoc.data() as { tokenBalance?: number };
+          const currentBalance = userData.tokenBalance || 0;
+          
+          if (currentBalance < requiredTokens) {
+            throw new Error(`Insufficient tokens. Required: ${requiredTokens}, Available: ${currentBalance}`);
+          }
+          
+          transaction.update(userRef, {
+            tokenBalance: currentBalance - requiredTokens,
+            updatedAt: new Date().toISOString(),
+          });
+        });
+        
+        console.log(`Consumed ${requiredTokens} tokens for stamp ${stampId}`);
+        
+        // 2. 画像生成処理を実行
+        const originalImagesQuery = await db
+          .collection('images')
+          .where('stampId', '==', stampId)
+          .where('type', '==', 'original')
+          .orderBy('sequence')
+          .get();
+
+        const originalImageUrls = originalImagesQuery.docs.map((doc: any) => {
+          const data = doc.data() as ImageRecord;
+          return data.url;
+        });
+
+        // モック画像生成サービスを実行
+        await imageGeneratorService.generateStampImages(stampId, originalImageUrls);
+
+        // 生成完了後、ステータスを更新
+        await db.collection('stamps').doc(stampId).update({
+          status: 'generated',
+          updatedAt: new Date().toISOString(),
+        });
+        
+        console.log(`Stamp generation completed for ${stampId}`);
+        
+      } catch (error) {
+        console.error(`Failed to generate stamp ${stampId}:`, error);
+        
+        // エラー時はステータスをfailedに更新
+        await db.collection('stamps').doc(stampId).update({
+          status: 'failed',
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    });
+
     const response: SetPresetResponse = {
       stampId,
       presetId,

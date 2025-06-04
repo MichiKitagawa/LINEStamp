@@ -40,7 +40,7 @@ export default function PreviewPage() {
   // プレビュー画像を取得
   const fetchPreviewImages = async (stampId: string) => {
     try {
-      const response = await fetch(`/api/stamps/${stampId}/preview`, {
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_BASE_URL']}/stamps/${stampId}/preview`, {
         headers: {
           'Authorization': `Bearer ${await user?.getIdToken()}`,
         },
@@ -76,7 +76,7 @@ export default function PreviewPage() {
     setState(prev => ({ ...prev, status: 'submitting' }));
 
     try {
-      const response = await fetch('/api/stamps/submit', {
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_BASE_URL']}/stamps/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

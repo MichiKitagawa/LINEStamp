@@ -159,8 +159,8 @@ export default function UploadPage() {
         const data: UploadResponse = await response.json();
         console.log('Upload successful:', data);
         
-        // 生成画面へ遷移
-        router.push(`/generating?stampId=${data.stampId}`);
+        // プリセット選択画面へ遷移
+        router.push(`/preset?stampId=${data.stampId}`);
       } else {
         const errorData = await response.json();
         setError(errorData.message || 'アップロードに失敗しました');
@@ -353,7 +353,7 @@ export default function UploadPage() {
                   アップロード中...
                 </span>
               ) : (
-                '次へ（生成開始）'
+                '次へ（スタイル選択）'
               )}
             </button>
             

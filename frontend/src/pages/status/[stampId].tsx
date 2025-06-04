@@ -49,7 +49,7 @@ export default function StatusPage() {
   // ステータスをポーリング
   const pollStatus = async (stampId: string) => {
     try {
-      const response = await fetch(`/api/stamps/${stampId}/status`, {
+      const response = await fetch(`${process.env['NEXT_PUBLIC_API_BASE_URL']}/stamps/${stampId}/status`, {
         headers: {
           'Authorization': `Bearer ${await user?.getIdToken()}`,
         },

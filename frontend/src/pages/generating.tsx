@@ -39,16 +39,78 @@ export default function GeneratingPage() {
   
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
-  // トークン消費とスタンプ生成開始
+  // スタンプ生成開始 → プリセット選択後は直接ポーリング開始に変更
   const startGeneration = async (stampId: string) => {
+    try {
+      setState({
+        status: 'consuming_tokens',
+        message: 'ステータスを確認中...'
+      });
+
+      // プリセット選択後はステータスが既に'generating'になっているため
+      // 直接ステータスをチェックしてポーリングを開始
+      const statusResponse = await fetch(`${process.env['NEXT_PUBLIC_API_BASE_URL']}/stamps/${stampId}/status`, {
+        headers: {
+          'Authorization': `Bearer ${await user?.getIdToken()}`,
+        },
+      });
+
+      if (!statusResponse.ok) {
+        throw new Error('ステータスの確認に失敗しました');
+      }
+
+      const statusData = await statusResponse.json();
+      console.log('Current stamp status:', statusData.status);
+
+      if (statusData.status === 'generating') {
+        // 既に生成中の場合は直接ポーリングを開始
+        setState({
+          status: 'generating',
+          message: 'スタンプを生成中...'
+        });
+        startStatusPolling(stampId);
+
+      } else if (statusData.status === 'pending_generate') {
+        // 生成開始が必要な場合のみgenerate APIを呼び出し
+        await startGenerationProcess(stampId);
+
+      } else if (statusData.status === 'generated') {
+        // 既に生成完了している場合はプレビューへ
+        setState({
+          status: 'completed',
+          message: '生成が完了しました！プレビュー画面に移動します...'
+        });
+        setTimeout(() => {
+          router.push(`/preview/${stampId}`);
+        }, 1000);
+
+      } else {
+        throw new Error(`無効なステータス: ${statusData.status}`);
+      }
+
+    } catch (error) {
+      console.error('Generation start error:', error);
+      setState({
+        status: 'error',
+        message: 'エラーが発生しました',
+        error: error instanceof Error ? error.message : '不明なエラー'
+      });
+    }
+  };
+
+  // 実際の生成プロセス開始（必要な場合のみ）
+  const startGenerationProcess = async (stampId: string) => {
     try {
       setState({
         status: 'consuming_tokens',
         message: 'トークンを消費中...'
       });
 
-      // Step 1: トークンを消費（5トークン × 8画像 = 40トークン）
-      const consumeResponse = await fetch('/api/tokens/consume', {
+      // Step 1: トークンを消費（5トークン × 実際の画像数）
+      // 実際の画像数は画像アップロード時に決まるが、ここでは8枚固定で計算
+      const requiredTokens = 8 * 5; // 8枚 × 5トークン
+      
+      const consumeResponse = await fetch(`${process.env['NEXT_PUBLIC_API_BASE_URL']}/tokens/consume`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -56,13 +118,21 @@ export default function GeneratingPage() {
         },
         body: JSON.stringify({
           stampId,
-          amount: 40, // 5トークン × 8画像
+          amount: requiredTokens,
         }),
       });
 
       if (!consumeResponse.ok) {
-        const errorData = await consumeResponse.json();
-        throw new Error(errorData.message || 'トークンの消費に失敗しました');
+        let errorMessage = 'トークンの消費に失敗しました';
+        try {
+          const errorData = await consumeResponse.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          // JSONパースに失敗した場合（HTMLが返されている可能性）
+          console.error('Failed to parse error response as JSON:', parseError);
+          errorMessage = `サーバーエラー (${consumeResponse.status})`;
+        }
+        throw new Error(errorMessage);
       }
 
       const consumeData: ConsumeTokensResponse = await consumeResponse.json();
@@ -74,7 +144,7 @@ export default function GeneratingPage() {
       });
 
       // Step 2: スタンプ生成を開始
-      const generateResponse = await fetch('/api/stamps/generate', {
+      const generateResponse = await fetch(`${process.env['NEXT_PUBLIC_API_BASE_URL']}/stamps/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -84,8 +154,15 @@ export default function GeneratingPage() {
       });
 
       if (!generateResponse.ok) {
-        const errorData = await generateResponse.json();
-        throw new Error(errorData.message || 'スタンプ生成の開始に失敗しました');
+        let errorMessage = 'スタンプ生成の開始に失敗しました';
+        try {
+          const errorData = await generateResponse.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (parseError) {
+          console.error('Failed to parse error response as JSON:', parseError);
+          errorMessage = `サーバーエラー (${generateResponse.status})`;
+        }
+        throw new Error(errorMessage);
       }
 
       const generateData: GenerateStampResponse = await generateResponse.json();
@@ -95,7 +172,7 @@ export default function GeneratingPage() {
       startStatusPolling(stampId);
 
     } catch (error) {
-      console.error('Generation start error:', error);
+      console.error('Generation process error:', error);
       setState({
         status: 'error',
         message: 'エラーが発生しました',
@@ -108,7 +185,7 @@ export default function GeneratingPage() {
   const startStatusPolling = (stampId: string) => {
     const pollStatus = async () => {
       try {
-        const response = await fetch(`/api/stamps/${stampId}/status`, {
+        const response = await fetch(`${process.env['NEXT_PUBLIC_API_BASE_URL']}/stamps/${stampId}/status`, {
           headers: {
             'Authorization': `Bearer ${await user?.getIdToken()}`,
           },

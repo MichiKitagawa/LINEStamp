@@ -103,6 +103,33 @@ export default function PresetPage() {
     }
   };
 
+  // プリセット用の背景色とアイコンを取得するヘルパー関数
+  const getPresetBackground = (presetId: string): string => {
+    switch (presetId) {
+      case 'colorful-pop':
+        return 'bg-gradient-to-br from-pink-400 via-purple-500 to-blue-500';
+      case 'simple-white':
+        return 'bg-gradient-to-br from-gray-600 to-gray-800';
+      case 'vintage-retro':
+        return 'bg-gradient-to-br from-yellow-600 via-orange-500 to-red-500';
+      default:
+        return 'bg-gradient-to-br from-blue-400 to-purple-500';
+    }
+  };
+
+  const getPresetIcon = (presetId: string): string => {
+    switch (presetId) {
+      case 'colorful-pop':
+        return '🌈';
+      case 'simple-white':
+        return '⚪';
+      case 'vintage-retro':
+        return '📼';
+      default:
+        return '🎨';
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -188,8 +215,8 @@ export default function PresetPage() {
                           className="object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <div className="text-gray-400 text-4xl">🎨</div>
+                        <div className={`w-full h-full flex items-center justify-center ${getPresetBackground(preset.id)}`}>
+                          <div className="text-white text-4xl">{getPresetIcon(preset.id)}</div>
                         </div>
                       )}
                       
@@ -228,18 +255,8 @@ export default function PresetPage() {
                     const selectedPreset = presets.find(p => p.id === selectedPresetId);
                     return selectedPreset ? (
                       <div className="flex items-center space-x-4">
-                        <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                          {selectedPreset.thumbnailUrl ? (
-                            <Image
-                              src={selectedPreset.thumbnailUrl}
-                              alt={selectedPreset.label}
-                              width={64}
-                              height={64}
-                              className="object-cover rounded-lg"
-                            />
-                          ) : (
-                            <div className="text-gray-400 text-2xl">🎨</div>
-                          )}
+                        <div className={`w-16 h-16 rounded-lg flex items-center justify-center ${getPresetBackground(selectedPreset.id)}`}>
+                          <div className="text-white text-2xl">{getPresetIcon(selectedPreset.id)}</div>
                         </div>
                         <div>
                           <h4 className="font-medium text-gray-900">
