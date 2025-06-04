@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Script from 'next/script';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/utils/apiClient';
 import { TOKEN_PACKAGES, CheckoutSessionResponse } from '@/types/tokens';
 
 export default function PurchasePage() {
   const { user, loading: authLoading } = useAuth();
-  const [selectedPackage, setSelectedPackage] = useState<string>('40tokens');
+  const [selectedPackage, setSelectedPackage] = useState<string>('200tokens');
   const [creatingSession, setCreatingSession] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stripeLoaded, setStripeLoaded] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -24,8 +26,24 @@ export default function PurchasePage() {
     }
   }, [router.query]);
 
+  const handleStripeLoad = () => {
+    console.log('🔄 Stripe.js loaded successfully');
+    setStripeLoaded(true);
+  };
+
   const handlePurchase = async () => {
     if (!selectedPackage) return;
+
+    if (!stripeLoaded) {
+      setError('決済システムの読み込み中です。少々お待ちください。');
+      return;
+    }
+
+    const stripe = (window as any).Stripe;
+    if (!stripe || typeof stripe !== 'function') {
+      setError('決済システムの初期化に失敗しました。ページを再読み込みしてください。');
+      return;
+    }
 
     try {
       setCreatingSession(true);
@@ -37,8 +55,8 @@ export default function PurchasePage() {
       );
 
       // Stripe Checkoutページにリダイレクト
-      const stripe = (window as any).Stripe(process.env['NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY']);
-      const { error } = await stripe.redirectToCheckout({
+      const stripeInstance = stripe(process.env['NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY']);
+      const { error } = await stripeInstance.redirectToCheckout({
         sessionId: response.sessionId,
       });
 
@@ -70,6 +88,16 @@ export default function PurchasePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Stripe.js スクリプトの読み込み */}
+      <Script
+        src="https://js.stripe.com/v3/"
+        onLoad={handleStripeLoad}
+        onError={() => {
+          console.error('Failed to load Stripe.js');
+          setError('決済システムの読み込みに失敗しました。ページを再読み込みしてください。');
+        }}
+      />
+
       {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -173,13 +201,18 @@ export default function PurchasePage() {
             <div className="text-center">
               <button
                 onClick={handlePurchase}
-                disabled={!selectedPackage || creatingSession}
+                disabled={!selectedPackage || creatingSession || !stripeLoaded}
                 className="w-full max-w-md px-8 py-4 bg-primary-600 text-white text-lg font-semibold rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
               >
                 {creatingSession ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                     決済ページに移動中...
+                  </div>
+                ) : !stripeLoaded ? (
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                    決済システム読み込み中...
                   </div>
                 ) : (
                   `${TOKEN_PACKAGES[selectedPackage]?.name || ''} を購入する`

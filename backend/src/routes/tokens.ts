@@ -46,15 +46,21 @@ router.post('/checkout-session', verifyIdToken, async (req: Request, res: Respon
       payment_method_types: ['card'],
       line_items: [
         {
-          price_data: {
-            currency: 'jpy',
-            product_data: {
-              name: packageInfo.name,
-              description: packageInfo.description,
-            },
-            unit_amount: packageInfo.price,
-          },
-          quantity: 1,
+          // Price IDが設定されている場合はそれを使用、設定されていない場合はprice_dataを使用
+          ...(packageInfo.stripePriceId 
+            ? { price: packageInfo.stripePriceId, quantity: 1 }
+            : {
+                price_data: {
+                  currency: 'jpy',
+                  product_data: {
+                    name: packageInfo.name,
+                    description: packageInfo.description,
+                  },
+                  unit_amount: packageInfo.price,
+                },
+                quantity: 1,
+              }
+          ),
         },
       ],
       mode: 'payment',

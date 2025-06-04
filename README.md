@@ -106,6 +106,18 @@ cd ../tests && npm install
    - イベント: `checkout.session.completed`
    - Webhook署名シークレットを取得
 
+#### 4.2 トークンパッケージの価格IDを作成
+1. 商品 > 商品カタログで新しい商品を作成：
+   - **50トークンパック**: 5000円
+   - **200トークンパック**: 2,000円  
+   - **1000トークンパック**: 9,800円
+2. 各商品に対して価格を設定し、価格ID（price_xxx）をコピー
+3. 価格IDを環境変数に設定：
+   - `STRIPE_PRICE_50_TOKENS=price_your_50_tokens_price_id`
+   - `STRIPE_PRICE_200_TOKENS=price_your_200_tokens_price_id`
+   - `STRIPE_PRICE_1000_TOKENS=price_your_1000_tokens_price_id`
+
+**注意**: 価格IDが設定されていない場合は自動的に`price_data`方式にフォールバックします。
 ### 5. 環境変数の設定
 
 #### 5.1 バックエンド (`backend/.env`)
@@ -119,6 +131,11 @@ FIREBASE_STORAGE_BUCKET=your-project.appspot.com
 # Stripe設定
 STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+
+# Stripe Price IDs（推奨：事前に作成）
+STRIPE_PRICE_50_TOKENS=price_your_50_tokens_price_id
+STRIPE_PRICE200_TOKENS=price_your_200_tokens_price_id
+STRIPE_PRICE_1000_TOKENS=price_your_1000_tokens_price_id
 
 # サーバー設定
 PORT=3001
