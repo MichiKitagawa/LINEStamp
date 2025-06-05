@@ -212,6 +212,18 @@ export default function GeneratingPage() {
             router.push(`/preview/${stampId}`);
           }, 2000);
 
+        } else if (data.status === 'submitting' || data.status === 'submitted') {
+          // 既に申請処理が開始/完了している場合 → 適切な画面へ遷移
+          if (pollingInterval) {
+            clearInterval(pollingInterval);
+          }
+          
+          if (data.status === 'submitted') {
+            router.push(`/success/${stampId}`);
+          } else {
+            router.push(`/status/${stampId}`);
+          }
+
         } else if (data.status === 'failed') {
           // 生成失敗 → エラー画面へ遷移
           if (pollingInterval) {
@@ -241,8 +253,8 @@ export default function GeneratingPage() {
       }
     };
 
-    // 1秒間隔でポーリング
-    const interval = setInterval(pollStatus, 1000);
+    // 3秒間隔でポーリング（Rate Limiting対策）
+    const interval = setInterval(pollStatus, 3000);
     setPollingInterval(interval);
     
     // 初回実行

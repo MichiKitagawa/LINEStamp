@@ -123,8 +123,8 @@ export default function StatusPage() {
 
   // ポーリング開始
   const startStatusPolling = (stampId: string) => {
-    // 1.5秒間隔でポーリング
-    const interval = setInterval(() => pollStatus(stampId), 1500);
+    // 4秒間隔でポーリング（Rate Limiting対策）
+    const interval = setInterval(() => pollStatus(stampId), 4000);
     setPollingInterval(interval);
     
     // 初回実行

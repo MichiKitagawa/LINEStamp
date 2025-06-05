@@ -76,6 +76,28 @@ export default function PreviewPage() {
     setState(prev => ({ ...prev, status: 'submitting' }));
 
     try {
+      // 申請前に最新ステータスを確認
+      const statusResponse = await fetch(`${process.env['NEXT_PUBLIC_API_BASE_URL']}/stamps/${stampId}/status`, {
+        headers: {
+          'Authorization': `Bearer ${await user?.getIdToken()}`,
+        },
+      });
+
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        
+        // 既に申請済みの場合は適切な画面に遷移
+        if (statusData.status === 'submitting') {
+          router.push(`/status/${stampId}`);
+          return;
+        } else if (statusData.status === 'submitted') {
+          router.push(`/success/${stampId}`);
+          return;
+        } else if (statusData.status !== 'generated') {
+          throw new Error(`Invalid status: ${statusData.status}. Can only submit from generated status.`);
+        }
+      }
+
       const response = await fetch(`${process.env['NEXT_PUBLIC_API_BASE_URL']}/stamps/submit`, {
         method: 'POST',
         headers: {

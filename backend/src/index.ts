@@ -22,10 +22,10 @@ const PORT = process.env['PORT'] ?? 3001;
 // Security middleware
 app.use(helmet());
 
-// Rate limiting
+// Rate limiting - 開発環境では緩和
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: process.env['NODE_ENV'] === 'production' ? 100 : 1000, // 開発時は1000に増加
   message: 'Too many requests from this IP, please try again later.',
 });
 app.use(limiter);
