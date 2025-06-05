@@ -93,7 +93,11 @@ export default function PresetPage() {
         router.push(`/generating?stampId=${data.stampId}`);
       } else {
         const errorData = await response.json();
-        setError(errorData.message || 'プリセットの適用に失敗しました');
+        if (errorData.message && errorData.message.includes('Insufficient tokens')) {
+          setError('トークンが不足しています。40トークン必要です。トークンを購入してから再度お試しください。');
+        } else {
+          setError(errorData.message || 'プリセットの適用に失敗しました');
+        }
       }
     } catch (error) {
       console.error('Apply preset error:', error);

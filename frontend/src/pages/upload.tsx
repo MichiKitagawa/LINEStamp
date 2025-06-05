@@ -128,8 +128,8 @@ export default function UploadPage() {
     setImages(prev => prev.filter(img => img.id !== id));
   };
 
-  // 必要トークン数計算
-  const requiredTokens = images.length * 5;
+  // 必要トークン数は固定で40トークン（8枚 × 5トークン）
+  const requiredTokens = 40;
   const canUpload = images.length >= UPLOAD_VALIDATION.MIN_FILES && tokenBalance >= requiredTokens;
 
   // アップロード実行
@@ -219,7 +219,7 @@ export default function UploadPage() {
                   {requiredTokens} トークン
                 </p>
                 <p className="text-xs text-gray-500">
-                  1枚あたり5トークン
+                  8枚×5トークン（固定）
                 </p>
               </div>
             </div>

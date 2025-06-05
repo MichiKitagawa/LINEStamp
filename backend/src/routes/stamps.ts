@@ -136,6 +136,22 @@ router.post('/set-preset', verifyIdToken, async (req: Request, res: Response): P
         throw new Error('Preset not found');
       }
 
+      // トークン残高チェックを追加
+      const requiredTokens = 8 * 5; // 8枚 × 5トークン = 40トークン
+      const userRef = db.collection('users').doc(uid);
+      const userDoc = await transaction.get(userRef);
+      
+      if (!userDoc.exists) {
+        throw new Error('User not found');
+      }
+      
+      const userData = userDoc.data() as { tokenBalance?: number };
+      const currentBalance = userData.tokenBalance || 0;
+      
+      if (currentBalance < requiredTokens) {
+        throw new Error(`Insufficient tokens. Required: ${requiredTokens}, Available: ${currentBalance}`);
+      }
+
       const presetData = presetDoc.data();
       
       // スタンプにプリセット情報を設定
@@ -245,6 +261,13 @@ router.post('/set-preset', verifyIdToken, async (req: Request, res: Response): P
         res.status(403).json({
           error: 'Forbidden',
           message: 'You do not have permission to modify this stamp',
+        });
+        return;
+      }
+      if (error.message.includes('Insufficient tokens')) {
+        res.status(400).json({
+          error: 'Bad Request',
+          message: error.message,
         });
         return;
       }
@@ -817,5 +840,76 @@ router.post('/retry', verifyIdToken, async (req: Request, res: Response): Promis
   }
 });
 
+
+/**
+ * POST /stamps/clear-submitted
+ * submitted状態のスタンプを初期化（新規作成前の準備）
+ */
+router.post('/clear-submitted', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!firestore) {
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Database service is not configured',
+      });
+      return;
+    }
+
+    const uid = req.uid!;
+    console.log(`Clearing submitted stamps for user ${uid}`);
+
+    // ユーザーのsubmitted状態のスタンプを取得
+    const submittedStampsQuery = await firestore
+      .collection('stamps')
+      .where('userId', '==', uid)
+      .where('status', '==', 'submitted')
+      .get();
+
+    if (submittedStampsQuery.empty) {
+      res.status(200).json({
+        message: 'No submitted stamps found to clear',
+        clearedCount: 0,
+      });
+      return;
+    }
+
+    // バッチ削除でsubmittedスタンプを削除
+    const batch = firestore.batch();
+    let clearedCount = 0;
+
+    submittedStampsQuery.docs.forEach((doc: any) => {
+      batch.delete(doc.ref);
+      clearedCount++;
+    });
+
+    // 関連する画像データも削除
+    for (const stampDoc of submittedStampsQuery.docs) {
+      const stampId = stampDoc.id;
+      const imagesQuery = await firestore
+        .collection('images')
+        .where('stampId', '==', stampId)
+        .get();
+      
+      imagesQuery.docs.forEach((imageDoc: any) => {
+        batch.delete(imageDoc.ref);
+      });
+    }
+
+    await batch.commit();
+
+    console.log(`Cleared ${clearedCount} submitted stamps for user ${uid}`);
+
+    res.status(200).json({
+      message: `Successfully cleared ${clearedCount} submitted stamps`,
+      clearedCount,
+    });
+  } catch (error) {
+    console.error('Failed to clear submitted stamps:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'Failed to clear submitted stamps',
+    });
+  }
+});
 
 export default router; 

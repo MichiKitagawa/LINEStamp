@@ -174,7 +174,7 @@ export default function PreviewPage() {
               スタンププレビュー
             </h2>
             <p className="text-gray-600">
-              生成されたスタンプの確認と申請
+              生成されたスタンプを確認してLINE Creators Marketに申請します
             </p>
           </div>
 
@@ -283,14 +283,7 @@ export default function PreviewPage() {
 
               {/* アクションボタン */}
               {state.images.length > 0 && (
-                <div className="text-center space-x-4">
-                  <button
-                    onClick={() => router.push('/dashboard')}
-                    className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                    disabled={state.status === 'submitting'}
-                  >
-                    後で申請する
-                  </button>
+                <div className="text-center">
                   <button
                     onClick={handleSubmit}
                     disabled={state.status === 'submitting'}
@@ -300,7 +293,7 @@ export default function PreviewPage() {
                       <>
                         <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                         申請中...
                       </>
@@ -324,7 +317,7 @@ export default function PreviewPage() {
             </div>
             <div className="ml-3">
               <p className="text-sm text-blue-700">
-                💡 申請後はLINE Creators Marketでの審査が開始されます。進捗は申請状況画面で確認できます。
+                💡 申請を開始すると、スタンプ作成フローが完了まで進みます。申請後はLINE Creators Marketでの審査が開始されます。
               </p>
             </div>
           </div>

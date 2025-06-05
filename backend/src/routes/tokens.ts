@@ -134,9 +134,12 @@ router.get('/balance', verifyIdToken, async (req: Request, res: Response) => {
  * Stripe Webhook を受信してトークンを付与
  */
 router.post('/webhook/stripe', async (req: Request, res: Response) => {
+  console.log('📥 Stripe webhook received:', req.headers['stripe-signature'] ? 'with signature' : 'without signature');
+  
   try {
     // Firebase機能が無効な場合のチェック
     if (!firestore) {
+      console.error('🔥 Firebase not configured');
       res.status(503).json({
         error: 'Service Unavailable',
         message: 'Database service is not configured',
@@ -146,6 +149,7 @@ router.post('/webhook/stripe', async (req: Request, res: Response) => {
 
     // Stripe機能が無効な場合のチェック
     if (!stripe) {
+      console.error('💳 Stripe not configured');
       res.status(503).json({
         error: 'Service Unavailable',
         message: 'Payment service is not configured',
@@ -155,6 +159,9 @@ router.post('/webhook/stripe', async (req: Request, res: Response) => {
 
     const sig = req.headers['stripe-signature'] as string;
     const webhookSecret = process.env['STRIPE_WEBHOOK_SECRET'];
+
+    console.log('🔐 Webhook secret configured:', !!webhookSecret);
+    console.log('📝 Signature present:', !!sig);
 
     if (!webhookSecret) {
       console.error('STRIPE_WEBHOOK_SECRET is not set');
@@ -169,8 +176,9 @@ router.post('/webhook/stripe', async (req: Request, res: Response) => {
     try {
       // Webhook の署名を検証
       event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+      console.log('✅ Webhook signature verified successfully');
     } catch (err) {
-      console.error('Webhook signature verification failed:', err);
+      console.error('❌ Webhook signature verification failed:', err);
       res.status(400).json({
         error: 'Bad Request',
         message: 'Invalid webhook signature',
@@ -178,13 +186,17 @@ router.post('/webhook/stripe', async (req: Request, res: Response) => {
       return;
     }
 
+    console.log('🎯 Webhook event type:', event.type);
+
     // checkout.session.completed イベントを処理
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as any;
       const { userId, tokenPackage } = session.metadata;
 
+      console.log('💰 Processing checkout completion for:', { userId, tokenPackage });
+
       if (!userId || !tokenPackage) {
-        console.error('Missing metadata in webhook:', session.metadata);
+        console.error('❌ Missing metadata in webhook:', session.metadata);
         res.status(400).json({
           error: 'Bad Request',
           message: 'Invalid metadata',
@@ -195,7 +207,7 @@ router.post('/webhook/stripe', async (req: Request, res: Response) => {
       // パッケージ情報を取得
       const packageInfo = TOKEN_PACKAGES[tokenPackage];
       if (!packageInfo) {
-        console.error('Invalid token package:', tokenPackage);
+        console.error('❌ Invalid token package:', tokenPackage);
         res.status(400).json({
           error: 'Bad Request',
           message: 'Invalid token package',
@@ -203,17 +215,23 @@ router.post('/webhook/stripe', async (req: Request, res: Response) => {
         return;
       }
 
+      console.log('📦 Package info:', { id: packageInfo.id, tokens: packageInfo.tokens });
+
       // Firestore トランザクションでトークンを付与
       await firestore!.runTransaction(async (transaction: any) => {
         const userRef = firestore!.collection('users').doc(userId);
         const userDoc = await transaction.get(userRef);
 
         if (!userDoc.exists) {
+          console.error('❌ User not found in Firestore:', userId);
           throw new Error('User not found');
         }
 
         const userData = userDoc.data()!;
-        const newBalance = (userData['tokenBalance'] || 0) + packageInfo.tokens;
+        const currentBalance = userData['tokenBalance'] || 0;
+        const newBalance = currentBalance + packageInfo.tokens;
+
+        console.log('🔄 Token balance update:', { currentBalance, adding: packageInfo.tokens, newBalance });
 
         // ユーザーのトークン残数を更新
         transaction.update(userRef, {
@@ -235,7 +253,9 @@ router.post('/webhook/stripe', async (req: Request, res: Response) => {
         transaction.set(transactionRef, transactionData);
       });
 
-      console.log(`Tokens added successfully: ${userId} +${packageInfo.tokens}`);
+      console.log(`✅ Tokens added successfully: ${userId} +${packageInfo.tokens}`);
+    } else {
+      console.log('ℹ️ Ignoring webhook event type:', event.type);
     }
 
     res.status(200).json({ received: true });

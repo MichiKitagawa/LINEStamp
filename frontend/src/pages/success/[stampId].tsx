@@ -60,10 +60,7 @@ export default function SuccessPage() {
     router.push('/dashboard');
   };
 
-  // 新しいスタンプ作成
-  const handleCreateNewStamp = () => {
-    router.push('/upload');
-  };
+
 
   // 初期化処理
   useEffect(() => {

@@ -48,6 +48,8 @@ export default function DashboardPage() {
     // 決済成功メッセージの表示
     if (router.query['payment'] === 'success') {
       setSuccessMessage('決済が完了しました！トークンが追加されました。');
+      // トークン残高を再取得
+      fetchTokenBalance();
       // URLから決済パラメータを削除
       router.replace('/dashboard', undefined, { shallow: true });
     }
@@ -73,9 +75,9 @@ export default function DashboardPage() {
       const stamps = response.stamps || [];
       setPendingStamps(stamps);
       
-      // 申請中・申請済みのスタンプがあるかチェック
+      // 申請中のスタンプがあるかチェック（submittedは新規作成時に初期化される）
       const hasActivSubmission = stamps.some((stamp: any) => 
-        stamp.status === 'submitting' || stamp.status === 'submitted'
+        stamp.status === 'submitting'
       );
       setHasPendingSubmission(hasActivSubmission);
     } catch (error) {
@@ -110,18 +112,38 @@ export default function DashboardPage() {
     router.push('/purchase');
   };
 
-  const handleCreateStamp = () => {
-    if (!userProfile || userProfile.tokenBalance < 5) {
+  const handleCreateStamp = async () => {
+    if (!userProfile || userProfile.tokenBalance < 40) {
       router.push('/purchase');
       return;
     }
     
-    // 申請中・申請済みのスタンプがある場合は警告
-    if (hasPendingSubmission) {
-      return;
+    try {
+      // submitted状態のスタンプがある場合は初期化
+      const hasSubmittedStamps = pendingStamps.some((stamp: any) => stamp.status === 'submitted');
+      
+      if (hasSubmittedStamps) {
+        setLoading(true);
+        const response = await apiClient.post('/stamps/clear-submitted');
+        console.log('Cleared submitted stamps:', response);
+        
+        // スタンプ一覧を再取得
+        await fetchUserStamps();
+      }
+      
+      // 申請中のスタンプがある場合は制限（submittedは初期化されているので除外）
+      const hasActiveSubmission = pendingStamps.some((stamp: any) => stamp.status === 'submitting');
+      if (hasActiveSubmission) {
+        return;
+      }
+      
+      router.push('/upload');
+    } catch (error) {
+      console.error('Failed to clear submitted stamps:', error);
+      setError('初期化処理でエラーが発生しました。再度お試しください。');
+    } finally {
+      setLoading(false);
     }
-    
-    router.push('/upload');
   };
 
   const handleRefreshBalance = () => {
@@ -256,12 +278,12 @@ export default function DashboardPage() {
                       </div>
                       <div className="ml-3">
                         <h3 className="text-sm font-medium text-orange-800">
-                          ⚠️ 申請待ちのスタンプがあります
+                          ⚠️ 申請中のスタンプがあります
                         </h3>
                         <p className="text-sm text-orange-700 mt-1">
-                          現在申請中または審査待ちのスタンプがあります。<br />
-                          <strong>新しいスタンプの作成は、審査結果が届いてから行ってください。</strong><br />
-                          重複申請は推奨されません。
+                          現在申請処理中のスタンプがあります。<br />
+                          <strong>申請が完了してから新しいスタンプを作成してください。</strong><br />
+                          同時申請は推奨されません。
                         </p>
                       </div>
                     </div>
@@ -274,23 +296,23 @@ export default function DashboardPage() {
                       オリジナル画像からスタンプを作成
                     </p>
                     <p className="text-sm text-gray-500">
-                      必要トークン: 5枚/画像 (最大8枚)
+                      必要トークン: 40枚 (8枚×5トークン)
                     </p>
                   </div>
                   <button
                     onClick={handleCreateStamp}
-                    disabled={!userProfile || userProfile.tokenBalance < 5 || hasPendingSubmission}
+                    disabled={!userProfile || userProfile.tokenBalance < 40 || hasPendingSubmission}
                     className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                   >
-                    {!userProfile || userProfile.tokenBalance < 5
+                    {!userProfile || userProfile.tokenBalance < 40
                       ? 'トークン不足'
                       : hasPendingSubmission
-                      ? '申請待ちあり'
+                      ? '申請中'
                       : 'スタンプ作成を始める'}
                   </button>
                 </div>
                 
-                {!userProfile || userProfile.tokenBalance < 5 ? (
+                {!userProfile || userProfile.tokenBalance < 40 ? (
                   <div className="mt-4 p-3 bg-warning-50 border border-warning-200 rounded-lg">
                     <p className="text-sm text-warning-800">
                       スタンプ作成にはトークンが必要です。まずはトークンを購入してください。
@@ -406,11 +428,21 @@ export default function DashboardPage() {
                     }
                   </div>
                   {pendingStamps.filter((stamp: any) => 
-                    stamp.status === 'submitting' || stamp.status === 'submitted'
+                    stamp.status === 'submitting'
                   ).length > 0 && (
                     <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                       <p className="text-sm text-blue-700">
-                        💡 審査結果はLINE Creators Marketから通知されます。通常1〜7営業日かかります。
+                        💡 申請処理が完了するまでお待ちください。通常数分で完了します。
+                      </p>
+                    </div>
+                  )}
+                  
+                  {pendingStamps.filter((stamp: any) => 
+                    stamp.status === 'submitted'
+                  ).length > 0 && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-sm text-green-700">
+                        ✅ 申請完了済みのスタンプがあります。新しいスタンプ作成時に自動で整理されます。
                       </p>
                     </div>
                   )}
