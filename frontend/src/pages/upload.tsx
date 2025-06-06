@@ -90,37 +90,43 @@ export default function UploadPage() {
   const processFiles = async (files: File[]) => {
     setError('');
 
-    // ファイル数チェック
-    const totalFiles = images.length + files.length;
-    if (totalFiles > UPLOAD_VALIDATION.MAX_FILES) {
-      setError(`最大${UPLOAD_VALIDATION.MAX_FILES}枚まで選択できます`);
+    // 既に画像がある場合は処理しない
+    if (images.length > 0) {
+      setError('既に画像が選択されています。削除してから新しい画像を選択してください');
       return;
     }
 
-    const validFiles: ImageFile[] = [];
-    
-    for (const file of files) {
-      // バリデーション
-      const validation = validateImageFile(file);
-      if (!validation.isValid) {
-        setError(validation.error || 'ファイルが無効です');
-        continue;
-      }
-
-      // プレビュー画像生成
-      try {
-        const preview = await createImagePreview(file);
-        validFiles.push({
-          file,
-          preview,
-          id: Math.random().toString(36).substring(2),
-        });
-      } catch (error) {
-        console.error('Failed to create preview:', error);
-      }
+    // ファイル数チェック（1枚のみ）
+    if (files.length > 1) {
+      setError('1枚のみ選択してください');
+      return;
     }
 
-    setImages(prev => [...prev, ...validFiles]);
+    // 1枚のファイルを処理
+    const file = files[0];
+    if (!file) return;
+
+    // バリデーション
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      setError(validation.error || 'ファイルが無効です');
+      return;
+    }
+
+    // プレビュー画像生成
+    try {
+      const preview = await createImagePreview(file);
+      const imageFile: ImageFile = {
+        file,
+        preview,
+        id: Math.random().toString(36).substring(2),
+      };
+      
+      setImages([imageFile]); // 配列に1つだけ設定
+    } catch (error) {
+      console.error('Failed to create preview:', error);
+      setError('画像のプレビュー生成に失敗しました');
+    }
   };
 
   // 画像削除
@@ -198,7 +204,7 @@ export default function UploadPage() {
               画像をアップロード
             </h1>
             <p className="text-gray-600">
-              PNG・JPEGファイルを{UPLOAD_VALIDATION.MIN_FILES}〜{UPLOAD_VALIDATION.MAX_FILES}枚選択してください
+              PNG・JPEGファイルを1枚選択してください
             </p>
           </div>
 
@@ -240,21 +246,21 @@ export default function UploadPage() {
           </div>
 
           {/* ドラッグ&ドロップエリア */}
-          <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors mb-6 ${
-              dragActive
-                ? 'border-blue-400 bg-blue-50'
-                : 'border-gray-300 bg-white hover:border-gray-400'
-            }`}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-          >
+          {images.length === 0 && (
+            <div
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors mb-6 ${
+                dragActive
+                  ? 'border-blue-400 bg-blue-50'
+                  : 'border-gray-300 bg-white hover:border-gray-400'
+              }`}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+            >
             <input
               ref={fileInputRef}
               type="file"
-              multiple
               accept=".png,.jpg,.jpeg,image/png,image/jpeg"
               onChange={handleFileSelect}
               className="hidden"
@@ -287,7 +293,8 @@ export default function UploadPage() {
                 PNG、JPEG形式、最大{UPLOAD_VALIDATION.MAX_FILE_SIZE / (1024 * 1024)}MB
               </p>
             </div>
-          </div>
+            </div>
+          )}
 
           {/* エラー表示 */}
           {error && (
@@ -300,35 +307,42 @@ export default function UploadPage() {
           {images.length > 0 && (
             <div className="bg-white rounded-lg shadow p-6 mb-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                選択された画像 ({images.length}枚)
+                選択された画像
               </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {images.map((image) => (
-                  <div key={image.id} className="relative group">
-                    <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden">
-                      <Image
-                        src={image.preview}
-                        alt={image.file.name}
-                        fill
-                        className="object-cover"
-                      />
+              <div className="flex justify-center">
+                <div className="w-64">
+                  {images.map((image) => (
+                    <div key={image.id} className="relative group">
+                      <div className="aspect-square relative bg-gray-100 rounded-lg overflow-hidden">
+                        <Image
+                          src={image.preview}
+                          alt={image.file.name}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                      <button
+                        onClick={() => removeImage(image.id)}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600 transition-colors"
+                      >
+                        ×
+                      </button>
+                      <div className="mt-2">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {image.file.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {formatFileSize(image.file.size)}
+                        </p>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => removeImage(image.id)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600 transition-colors"
-                    >
-                      ×
-                    </button>
-                    <div className="mt-2">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {image.file.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {formatFileSize(image.file.size)}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-sm text-blue-800">
+                  💡 別の画像を選択したい場合は、上の「×」ボタンで画像を削除してから新しい画像を選択してください
+                </p>
               </div>
             </div>
           )}
@@ -359,16 +373,13 @@ export default function UploadPage() {
             
             {!canUpload && images.length === 0 && (
               <p className="text-sm text-gray-500 mt-2">
-                最低{UPLOAD_VALIDATION.MIN_FILES}枚の画像を選択してください
+                画像を1枚選択してください
               </p>
             )}
             
-            {!canUpload && images.length > 0 && tokenBalance >= requiredTokens && (
+            {!canUpload && images.length > 0 && tokenBalance < requiredTokens && (
               <p className="text-sm text-gray-500 mt-2">
-                {images.length < UPLOAD_VALIDATION.MIN_FILES 
-                  ? `あと${UPLOAD_VALIDATION.MIN_FILES - images.length}枚選択してください`
-                  : '準備完了'
-                }
+                トークンが不足しています
               </p>
             )}
           </div>

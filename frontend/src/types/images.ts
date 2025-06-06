@@ -58,7 +58,7 @@ export interface StampStatus {
 
 // バリデーション設定
 export const UPLOAD_VALIDATION = {
-  MAX_FILES: 8,
+  MAX_FILES: 1,
   MIN_FILES: 1,
   MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
   ALLOWED_MIME_TYPES: ['image/png', 'image/jpeg', 'image/jpg'],
