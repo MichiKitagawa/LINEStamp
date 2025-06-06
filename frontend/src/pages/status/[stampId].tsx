@@ -69,9 +69,10 @@ export default function StatusPage() {
       }));
 
       if (data.status === 'submitted') {
-        // 申請完了 → 成功画面へ遷移
+        // 申請完了 → ポーリング停止してから成功画面へ遷移
         if (pollingInterval) {
           clearInterval(pollingInterval);
+          setPollingInterval(null);
         }
         
         setState(prev => ({
@@ -80,14 +81,14 @@ export default function StatusPage() {
           currentStep: SUBMISSION_STEPS.length - 1
         }));
         
-        setTimeout(() => {
-          router.push(`/success/${stampId}`);
-        }, 3000);
+        // 即座に遷移（遅延なし）
+        router.push(`/success/${stampId}`);
 
       } else if (data.status === 'failed') {
         // 申請失敗 → エラー画面へ遷移
         if (pollingInterval) {
           clearInterval(pollingInterval);
+          setPollingInterval(null);
         }
         router.push(`/error/${stampId}`);
 
@@ -95,6 +96,7 @@ export default function StatusPage() {
         // セッション切れ → 再認証画面へ遷移
         if (pollingInterval) {
           clearInterval(pollingInterval);
+          setPollingInterval(null);
         }
         router.push(`/relogin/${stampId}`);
 
@@ -117,6 +119,7 @@ export default function StatusPage() {
       
       if (pollingInterval) {
         clearInterval(pollingInterval);
+        setPollingInterval(null);
       }
     }
   };

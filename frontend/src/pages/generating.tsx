@@ -202,6 +202,7 @@ export default function GeneratingPage() {
           // 生成完了 → プレビュー画面へ遷移
           if (pollingInterval) {
             clearInterval(pollingInterval);
+            setPollingInterval(null);
           }
           setState({
             status: 'completed',
@@ -213,21 +214,20 @@ export default function GeneratingPage() {
           }, 2000);
 
         } else if (data.status === 'submitting' || data.status === 'submitted') {
-          // 既に申請処理が開始/完了している場合 → 適切な画面へ遷移
+          // 既に申請処理が開始/完了している場合 → ポーリング停止して終了
           if (pollingInterval) {
             clearInterval(pollingInterval);
+            setPollingInterval(null);
           }
           
-          if (data.status === 'submitted') {
-            router.push(`/success/${stampId}`);
-          } else {
-            router.push(`/status/${stampId}`);
-          }
+          // generating.tsxではもう何もしない（status/[stampId].tsxに任せる）
+          console.log('申請処理が検知されました。generating.tsxのポーリングを停止します。');
 
         } else if (data.status === 'failed') {
           // 生成失敗 → エラー画面へ遷移
           if (pollingInterval) {
             clearInterval(pollingInterval);
+            setPollingInterval(null);
           }
           router.push(`/error/${stampId}`);
 
@@ -249,6 +249,7 @@ export default function GeneratingPage() {
         
         if (pollingInterval) {
           clearInterval(pollingInterval);
+          setPollingInterval(null);
         }
       }
     };

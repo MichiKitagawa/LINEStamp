@@ -26,7 +26,7 @@ export default function SuccessPage() {
     status: 'loading'
   });
 
-  // スタンプステータスを取得
+  // スタンプステータスを取得（1回のみ）
   const fetchStampStatus = async (stampId: string) => {
     try {
       const response = await fetch(`${process.env['NEXT_PUBLIC_API_BASE_URL']}/stamps/${stampId}/status`, {
@@ -57,10 +57,9 @@ export default function SuccessPage() {
 
   // ダッシュボードへ戻る
   const handleBackToDashboard = () => {
-    router.push('/dashboard');
+    // 確実にダッシュボードに遷移
+    window.location.href = '/dashboard';
   };
-
-
 
   // 初期化処理
   useEffect(() => {
@@ -85,6 +84,16 @@ export default function SuccessPage() {
       router.push('/login');
     }
   }, [authLoading, user, router]);
+
+  // ページ遷移時に全てのポーリングを確実にクリア
+  useEffect(() => {
+    return () => {
+      // 全ての可能なインターバルをクリア
+      for (let i = 1; i < 99999; i++) {
+        window.clearInterval(i);
+      }
+    };
+  }, []);
 
   // ローディング中
   if (authLoading || !user) {
