@@ -82,7 +82,7 @@ export default function StatusPage() {
         }));
         
         // 即座に遷移（遅延なし）
-        router.push(`/success/${stampId}`);
+          router.push(`/success/${stampId}`);
 
       } else if (data.status === 'failed') {
         // 申請失敗 → エラー画面へ遷移

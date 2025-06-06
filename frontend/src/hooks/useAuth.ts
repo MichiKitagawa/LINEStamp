@@ -50,6 +50,7 @@ export const useAuth = (): UseAuthReturn => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUserUid, setLastUserUid] = useState<string | null>(null);
 
   useEffect(() => {
     // E2Eテスト用のモック認証チェック
@@ -79,8 +80,15 @@ export const useAuth = (): UseAuthReturn => {
 
     // 通常のFirebase認証
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // 既に同じユーザーがセットされている場合は何もしない（重複防止）
+      if (user?.uid && user.uid === lastUserUid) {
+        return;
+      }
+
       if (user) {
-        // 開発環境でデバッグ情報を出力
+        setLastUserUid(user.uid);
+        
+        // 開発環境でデバッグ情報を出力（頻度を下げる）
         if (process.env.NODE_ENV === 'development') {
           console.log('🔐 認証状態変更検知:', {
             uid: user.uid,
@@ -99,6 +107,8 @@ export const useAuth = (): UseAuthReturn => {
             console.error('❌ IDトークン取得エラー:', tokenError);
           }
         }
+      } else {
+        setLastUserUid(null);
       }
       
       setUser(user);

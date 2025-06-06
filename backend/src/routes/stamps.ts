@@ -17,7 +17,7 @@ import {
   RetryStampRequest,
   RetryStampResponse,
 } from '@/types/stamps';
-import { imageGeneratorService } from '@/services/imageGeneratorMock';
+import { imageGenerationService } from '@/services/imageGenerationMock';
 import { puppeteerSubmissionService } from '@/services/puppeteerMock';
 
 const router = Router();
@@ -172,6 +172,24 @@ router.post('/set-preset', verifyIdToken, async (req: Request, res: Response): P
       try {
         console.log(`Starting automatic generation process for stamp ${stampId}`);
         
+        // 既存の処理済み画像があるかチェック（重複生成防止）
+        const existingProcessedImages = await db
+          .collection('images')
+          .where('stampId', '==', stampId)
+          .where('type', '==', 'processed')
+          .get();
+        
+        if (!existingProcessedImages.empty) {
+          console.log(`Processed images already exist for stamp ${stampId}. Skipping generation.`);
+          
+          // 既に処理済み画像がある場合はステータスのみ更新
+          await db.collection('stamps').doc(stampId).update({
+            status: 'generated',
+            updatedAt: new Date().toISOString(),
+          });
+          return;
+        }
+        
         // 1. トークンを消費
         const requiredTokens = 8 * 5; // 8枚 × 5トークン
         
@@ -205,13 +223,29 @@ router.post('/set-preset', verifyIdToken, async (req: Request, res: Response): P
           .orderBy('sequence')
           .get();
 
-        const originalImageUrls = originalImagesQuery.docs.map((doc: any) => {
-          const data = doc.data() as ImageRecord;
-          return data.url;
-        });
+        // オリジナル画像（1枚のみ）
+        const originalImageUrl = originalImagesQuery.docs[0]?.data().url;
+        
+        if (!originalImageUrl) {
+          throw new Error('Original image not found');
+        }
+
+        // プリセット情報を取得
+        const stampDoc = await db.collection('stamps').doc(stampId).get();
+        const stampData = stampDoc.data() as StampRecord;
+        const presetConfig = stampData.presetConfig;
+        
+        if (!presetConfig?.prompts || presetConfig.prompts.length !== 8) {
+          throw new Error('Invalid preset configuration: 8 prompts required');
+        }
 
         // モック画像生成サービスを実行
-        await imageGeneratorService.generateStampImages(stampId, originalImageUrls);
+        await imageGenerationService.generateStampImages(
+          stampId,
+          originalImageUrl,
+          presetConfig.prompts,
+          stampData.presetId!
+        );
 
         // 生成完了後、ステータスを更新
         await db.collection('stamps').doc(stampId).update({
@@ -420,8 +454,26 @@ router.post('/generate', verifyIdToken, async (req: Request, res: Response): Pro
           return data.url;
         });
 
+        // スタンプデータとプリセット情報を取得
+        const stampDoc = await db.collection('stamps').doc(stampId).get();
+        const stampData = stampDoc.data() as StampRecord;
+        const presetConfig = stampData.presetConfig;
+        
+        if (!originalImageUrls[0]) {
+          throw new Error('Original image not found');
+        }
+        
+        if (!presetConfig?.prompts || presetConfig.prompts.length !== 8) {
+          throw new Error('Invalid preset configuration: 8 prompts required');
+        }
+
         // モック画像生成サービスを実行
-        await imageGeneratorService.generateStampImages(stampId, originalImageUrls);
+        await imageGenerationService.generateStampImages(
+          stampId,
+          originalImageUrls[0],
+          presetConfig.prompts,
+          stampData.presetId!
+        );
 
         // 生成完了後、ステータスを更新
         await db.collection('stamps').doc(stampId).update({
@@ -909,6 +961,53 @@ router.post('/clear-submitted', verifyIdToken, async (req: Request, res: Respons
       error: 'Internal Server Error',
       message: 'Failed to clear submitted stamps',
     });
+  }
+});
+
+/**
+ * GET /stamps/:id/download
+ * スタンプ画像をZIPファイルでダウンロード
+ */
+router.get('/:id/download', verifyIdToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const uid = req.uid!;
+    const { id: stampId } = req.params;
+
+    // スタンプの存在確認と権限チェック
+    const stampDoc = await firestore.collection('stamps').doc(stampId).get();
+    if (!stampDoc.exists) {
+      res.status(404).json({ error: 'Stamp not found' });
+      return;
+    }
+
+    const stampData = stampDoc.data() as StampRecord;
+    if (stampData.userId !== uid) {
+      res.status(403).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    // 処理済み画像を取得（将来的にZIP生成に使用）
+    // const processedImagesQuery = await firestore
+    //   .collection('images')
+    //   .where('stampId', '==', stampId)
+    //   .where('type', '==', 'processed')
+    //   .orderBy('sequence')
+    //   .get();
+
+    // 処理済み画像データを取得（将来的にZIP生成に使用）
+    // const images = processedImagesQuery.docs.map((doc: any) => doc.data() as ImageRecord);
+
+    // ZIPファイル生成とダウンロード
+    // (archiver ライブラリを使用)
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="stamp-${stampId}.zip"`);
+    
+    // TODO: 実装はarchiverライブラリが必要
+    res.status(501).json({ error: 'ZIP download not implemented yet' });
+    
+  } catch (error) {
+    console.error('Download failed:', error);
+    res.status(500).json({ error: 'Download failed' });
   }
 });
 

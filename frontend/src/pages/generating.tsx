@@ -183,6 +183,12 @@ export default function GeneratingPage() {
 
   // ステータスポーリング
   const startStatusPolling = (stampId: string) => {
+    // 既存のポーリングが動いている場合は停止
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
+    }
+
     const pollStatus = async () => {
       try {
         const response = await fetch(`${process.env['NEXT_PUBLIC_API_BASE_URL']}/stamps/${stampId}/status`, {
@@ -277,12 +283,18 @@ export default function GeneratingPage() {
       return;
     }
 
+    // 既に処理中の場合は重複実行を防ぐ
+    if (state.status !== 'loading') {
+      return;
+    }
+
     startGeneration(stampId);
 
     // クリーンアップ
     return () => {
       if (pollingInterval) {
         clearInterval(pollingInterval);
+        setPollingInterval(null);
       }
     };
   }, [authLoading, user, stampId]);

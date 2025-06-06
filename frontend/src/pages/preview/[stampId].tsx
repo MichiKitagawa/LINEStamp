@@ -128,6 +128,42 @@ export default function PreviewPage() {
     }
   };
 
+  // ファイルの先頭付近に追加
+  const downloadImage = async (url: string, filename: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('ダウンロードに失敗しました');
+    }
+  };
+
+  // 全画像の一括ダウンロード
+  const downloadAllImages = async () => {
+    for (let i = 0; i < state.images.length; i++) {
+      const image = state.images[i];
+      if (!image) continue; // undefinedの場合はスキップ
+      
+      await downloadImage(image.url, `stamp_${image.sequence}.png`);
+      
+      // ダウンロード間隔を開ける（ブラウザの制限対策）
+      if (i < state.images.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+  };
+
   // 初期化処理
   useEffect(() => {
     if (authLoading || !user || !stampId) {
@@ -258,9 +294,19 @@ export default function PreviewPage() {
 
               {/* スタンプ画像グリッド */}
               <div className="mb-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  スタンプセット ({state.images.length}枚)
-                </h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    スタンプセット ({state.images.length}枚)
+                  </h3>
+                  {state.images.length > 0 && (
+                    <button
+                      onClick={downloadAllImages}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                    >
+                      📥 全画像をダウンロード
+                    </button>
+                  )}
+                </div>
                 
                 {state.images.length === 0 ? (
                   <div className="text-center py-8">
@@ -275,12 +321,20 @@ export default function PreviewPage() {
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {state.images.map((image) => (
-                      <div key={image.id} className="bg-gray-100 rounded-lg p-3 aspect-square flex items-center justify-center">
-                        <img
-                          src={image.url}
-                          alt={`スタンプ ${image.sequence}`}
-                          className="max-w-full max-h-full object-contain"
-                        />
+                      <div key={image.id} className="bg-gray-100 rounded-lg p-3 aspect-square flex flex-col">
+                        <div className="flex-1 flex items-center justify-center">
+                          <img
+                            src={image.url}
+                            alt={`スタンプ ${image.sequence}`}
+                            className="max-w-full max-h-full object-contain"
+                          />
+                        </div>
+                        <button
+                          onClick={() => downloadImage(image.url, `stamp_${image.sequence}.png`)}
+                          className="mt-2 px-3 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors"
+                        >
+                          ⬇ ダウンロード
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -330,17 +384,41 @@ export default function PreviewPage() {
         </div>
 
         {/* 注意事項 */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-md p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+        <div className="mt-8 space-y-4">
+          {/* ダウンロードに関する説明 */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h4 className="text-sm font-medium text-yellow-800 mb-1">
+                  📥 画像ダウンロードについて
+                </h4>
+                <p className="text-sm text-yellow-700">
+                  <strong>申請が失敗した時に個人で申請を行えるようにするため、画像をダウンロードしておくことをおすすめします。</strong>
+                  <br />
+                  各画像を個別にダウンロードするか、「全画像をダウンロード」ボタンで一括取得できます。
+                </p>
+              </div>
             </div>
-            <div className="ml-3">
-              <p className="text-sm text-blue-700">
-                💡 申請を開始すると、スタンプ作成フローが完了まで進みます。申請後はLINE Creators Marketでの審査が開始されます。
-              </p>
+          </div>
+
+          {/* 既存の申請に関する注意事項 */}
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-blue-700">
+                  💡 申請を開始すると、スタンプ作成フローが完了まで進みます。申請後はLINE Creators Marketでの審査が開始されます。
+                </p>
+              </div>
             </div>
           </div>
         </div>
