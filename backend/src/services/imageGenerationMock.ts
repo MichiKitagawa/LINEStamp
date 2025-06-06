@@ -21,8 +21,9 @@ export interface ImageGenerationService {
  * スタンプ用画像処理設定
  */
 const STAMP_CONFIG = {
-  width: 370,
-  height: 320,
+  stamp: { width: 370, height: 320 },    // スタンプ画像
+  main: { width: 96, height: 74 },       // メイン画像  
+  tab: { width: 240, height: 240 },      // タブ画像
   format: 'png' as const,
   quality: 100,
   background: { r: 255, g: 255, b: 255, alpha: 0 }, // 透過背景
@@ -56,33 +57,34 @@ export class ImageGenerationMock implements ImageGenerationService {
       const existingProcessedImages = await firestore
         .collection('images')
         .where('stampId', '==', stampId)
-        .where('type', '==', 'processed')
+        .where('type', 'in', ['processed', 'main', 'tab'])
         .get();
       
       if (!existingProcessedImages.empty) {
-        console.log(`🗑️ Cleaning up ${existingProcessedImages.docs.length} existing processed images for stamp ${stampId}`);
+        console.log(`🗑️ Cleaning up ${existingProcessedImages.docs.length} existing images`);
         const batch = firestore.batch();
         existingProcessedImages.docs.forEach((doc: any) => {
           batch.delete(doc.ref);
         });
         await batch.commit();
       }
+
       // あらかじめ用意された画像を使用
       const mockGeneratedImages = await this.getMockGeneratedImages(presetId);
       
-      const processedImages: Omit<ImageRecord, 'id'>[] = [];
+      const allImages: Omit<ImageRecord, 'id'>[] = [];
       
+      // 1. スタンプ画像8枚を生成
       for (let i = 0; i < 8; i++) {
         const sequence = i + 1;
         const filename = `processed_${sequence}.png`;
         
-        // モック生成画像を処理（リサイズ・背景除去）
         const processedBuffer = await this.processGeneratedImage(
           mockGeneratedImages[i]!,
-          prompts[i]!
+          prompts[i]!,
+          'stamp'
         );
         
-        // Google Cloud Storageにアップロード
         const storagePath = `users/${stampId}/stamps/${stampId}/processed/${filename}`;
         const file = storage.bucket().file(storagePath);
         
@@ -94,18 +96,14 @@ export class ImageGenerationMock implements ImageGenerationService {
               sequence: sequence.toString(),
               type: 'processed',
               presetId,
-              prompt: prompts[i],
-              originalImageUrl,
             },
           },
         });
         
-        // 公開URLを取得
         await file.makePublic();
         const url = `https://storage.googleapis.com/${storage.bucket().name}/${storagePath}`;
         
-        // Firestoreに保存するデータを準備
-        processedImages.push({
+        allImages.push({
           stampId,
           type: 'processed',
           url,
@@ -115,17 +113,83 @@ export class ImageGenerationMock implements ImageGenerationService {
         });
       }
       
+      // 2. メイン画像を生成（1枚目画像をベースに96×74px）
+      const mainBuffer = await this.processGeneratedImage(
+        mockGeneratedImages[0]!,
+        prompts[0]!,
+        'main'
+      );
+      
+      const mainStoragePath = `users/${stampId}/stamps/${stampId}/main/main.png`;
+      const mainFile = storage.bucket().file(mainStoragePath);
+      
+      await mainFile.save(mainBuffer, {
+        metadata: {
+          contentType: 'image/png',
+          customMetadata: {
+            stampId,
+            type: 'main',
+            presetId,
+          },
+        },
+      });
+      
+      await mainFile.makePublic();
+      const mainUrl = `https://storage.googleapis.com/${storage.bucket().name}/${mainStoragePath}`;
+      
+      allImages.push({
+        stampId,
+        type: 'main',
+        url: mainUrl,
+        sequence: 1,
+        filename: 'main.png',
+        createdAt: new Date().toISOString(),
+      });
+      
+      // 3. タブ画像を生成（1枚目画像をベースに240×240px）
+      const tabBuffer = await this.processGeneratedImage(
+        mockGeneratedImages[0]!,
+        prompts[0]!,
+        'tab'
+      );
+      
+      const tabStoragePath = `users/${stampId}/stamps/${stampId}/tab/tab.png`;
+      const tabFile = storage.bucket().file(tabStoragePath);
+      
+      await tabFile.save(tabBuffer, {
+        metadata: {
+          contentType: 'image/png',
+          customMetadata: {
+            stampId,
+            type: 'tab',
+            presetId,
+          },
+        },
+      });
+      
+      await tabFile.makePublic();
+      const tabUrl = `https://storage.googleapis.com/${storage.bucket().name}/${tabStoragePath}`;
+      
+      allImages.push({
+        stampId,
+        type: 'tab',
+        url: tabUrl,
+        sequence: 1,
+        filename: 'tab.png',
+        createdAt: new Date().toISOString(),
+      });
+      
       // Firestoreに一括保存
       const batch = firestore.batch();
       
-      processedImages.forEach((imageData) => {
+      allImages.forEach((imageData) => {
         const imageRef = firestore.collection('images').doc();
         batch.set(imageRef, { ...imageData, id: imageRef.id });
       });
       
       await batch.commit();
       
-      console.log(`✅ Mock image generation completed for stamp ${stampId}. Generated 8 processed images.`);
+      console.log(`✅ Mock image generation completed for stamp ${stampId}. Generated 10 images total (8 stamps + 1 main + 1 tab).`);
     } catch (error) {
       console.error(`❌ Mock image generation failed for stamp ${stampId}:`, error);
       throw error;
@@ -159,18 +223,31 @@ export class ImageGenerationMock implements ImageGenerationService {
 
   /**
    * 生成された画像を処理（リサイズ・背景除去）
-   * @param imageBuffer 生成された画像のBuffer
-   * @param prompt 使用されたprompt（ログ用）
-   * @returns 処理済み画像のBuffer
    */
-  private async processGeneratedImage(imageBuffer: Buffer, prompt: string): Promise<Buffer> {
-    console.log(`🔧 Processing generated image with prompt: "${prompt.substring(0, 50)}..."`);
+  private async processGeneratedImage(
+    imageBuffer: Buffer, 
+    prompt: string, 
+    imageType: 'stamp' | 'main' | 'tab'
+  ): Promise<Buffer> {
+    console.log(`🔧 Processing ${imageType} image with prompt: "${prompt.substring(0, 50)}..."`);
     
-    // Sharp.jsで画像処理
+    let config;
+    switch (imageType) {
+      case 'stamp':
+        config = STAMP_CONFIG.stamp;
+        break;
+      case 'main':
+        config = STAMP_CONFIG.main;
+        break;
+      case 'tab':
+        config = STAMP_CONFIG.tab;
+        break;
+    }
+    
     const processedBuffer = await sharp(imageBuffer)
-      .resize(STAMP_CONFIG.width, STAMP_CONFIG.height, {
-        fit: 'contain', // アスペクト比を維持してリサイズ
-        background: STAMP_CONFIG.background, // 透過背景
+      .resize(config.width, config.height, {
+        fit: 'contain',
+        background: STAMP_CONFIG.background,
       })
       .png({
         quality: STAMP_CONFIG.quality,
@@ -189,8 +266,8 @@ export class ImageGenerationMock implements ImageGenerationService {
   private async createFallbackImage(sequence: number): Promise<Buffer> {
     const fallbackBuffer = await sharp({
       create: {
-        width: STAMP_CONFIG.width,
-        height: STAMP_CONFIG.height,
+        width: STAMP_CONFIG.stamp.width,
+        height: STAMP_CONFIG.stamp.height,
         channels: 4,
         background: { r: 255, g: 255, b: 255, alpha: 1 },
       }

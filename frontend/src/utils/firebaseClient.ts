@@ -26,7 +26,7 @@ if (process.env.NODE_ENV === 'development') {
   
   // 設定が不完全な場合の警告
   const missingConfigs = Object.entries(firebaseConfig)
-    .filter(([key, value]) => !value)
+    .filter(([, value]) => !value)
     .map(([key]) => key);
   
   if (missingConfigs.length > 0) {

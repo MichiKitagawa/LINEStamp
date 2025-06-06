@@ -582,7 +582,7 @@ router.get('/:id/preview', verifyIdToken, async (req: Request, res: Response): P
       return;
     }
 
-    // 処理済み画像を取得
+    // 処理済み画像を取得（スタンプ8枚）
     const processedImagesQuery = await firestore
       .collection('images')
       .where('stampId', '==', stampId)
@@ -600,7 +600,7 @@ router.get('/:id/preview', verifyIdToken, async (req: Request, res: Response): P
       };
     });
 
-    // メイン画像があれば取得（任意）
+    // メイン画像を取得
     let mainImage: ProcessedImage | undefined = undefined;
     const mainImageQuery = await firestore
       .collection('images')
@@ -622,10 +622,33 @@ router.get('/:id/preview', verifyIdToken, async (req: Request, res: Response): P
       }
     }
 
+    // タブ画像を取得
+    let tabImage: ProcessedImage | undefined = undefined;
+    const tabImageQuery = await firestore
+      .collection('images')
+      .where('stampId', '==', stampId)
+      .where('type', '==', 'tab')
+      .limit(1)
+      .get();
+
+    if (!tabImageQuery.empty) {
+      const tabImageDoc = tabImageQuery.docs[0];
+      if (tabImageDoc) {
+        const tabImageData = tabImageDoc.data() as ImageRecord;
+        tabImage = {
+          id: tabImageData.id,
+          url: tabImageData.url,
+          sequence: tabImageData.sequence,
+          filename: tabImageData.filename,
+        };
+      }
+    }
+
     const response: PreviewStampResponse = {
       stampId,
       processedImages,
       ...(mainImage && { mainImage }),
+      ...(tabImage && { tabImage }),
     };
 
     res.status(200).json(response);

@@ -13,6 +13,7 @@ interface PreviewStampResponse {
   stampId: string;
   processedImages: ProcessedImage[];
   mainImage?: ProcessedImage;
+  tabImage?: ProcessedImage;
 }
 
 interface SubmitStampResponse {
@@ -24,6 +25,7 @@ interface PreviewPageState {
   status: 'loading' | 'loaded' | 'submitting' | 'error';
   images: ProcessedImage[];
   mainImage?: ProcessedImage;
+  tabImage?: ProcessedImage;
   error?: string;
 }
 
@@ -57,6 +59,7 @@ export default function PreviewPage() {
         status: 'loaded',
         images: data.processedImages,
         ...(data.mainImage && { mainImage: data.mainImage }),
+        ...(data.tabImage && { tabImage: data.tabImage }),
       });
 
     } catch (error) {
@@ -128,39 +131,136 @@ export default function PreviewPage() {
     }
   };
 
-  // ファイルの先頭付近に追加
-  const downloadImage = async (url: string, filename: string) => {
+  // ダウンロード状態管理
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+
+  // 個別画像ダウンロード（改善版）
+  const downloadImage = async (url: string, filename: string, imageId?: string) => {
+    // 重複実行防止
+    if (downloadingId === imageId) {
+      return;
+    }
+
     try {
-      const response = await fetch(url);
+      if (imageId) {
+        setDownloadingId(imageId);
+      }
+
+      console.log(`Starting download: ${filename} from ${url}`);
+      
+      // プロキシ経由でダウンロードを試行（CORS回避）
+      const proxyUrl = `/api/download-proxy?url=${encodeURIComponent(url)}`;
+      let response: Response;
+      
+      try {
+        // まずプロキシ経由を試行
+        response = await fetch(proxyUrl);
+        if (!response.ok) {
+          throw new Error(`Proxy download failed: ${response.status}`);
+        }
+      } catch (proxyError) {
+        console.warn('Proxy download failed, trying direct download:', proxyError);
+        // プロキシが失敗した場合は直接ダウンロードを試行
+        response = await fetch(url, {
+          mode: 'cors',
+          credentials: 'omit',
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Direct download failed: ${response.status} ${response.statusText}`);
+        }
+      }
+      
       const blob = await response.blob();
+      
+      // blobが空でないかチェック
+      if (blob.size === 0) {
+        throw new Error('Downloaded file is empty');
+      }
       
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
       link.download = filename;
+      
+      // より確実なダウンロード実行
       document.body.appendChild(link);
       link.click();
       
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(downloadUrl);
+      // クリーンアップ
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(downloadUrl);
+      }, 100);
+      
+      console.log(`Download completed: ${filename}`);
+      
     } catch (error) {
-      console.error('Download failed:', error);
-      alert('ダウンロードに失敗しました');
+      console.error('Download failed for', filename, ':', error);
+      alert(`ダウンロードに失敗しました: ${filename}\n\n${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      if (imageId) {
+        setDownloadingId(null);
+      }
     }
   };
 
-  // 全画像の一括ダウンロード
+  // 全画像の一括ダウンロード（改善版）
   const downloadAllImages = async () => {
-    for (let i = 0; i < state.images.length; i++) {
-      const image = state.images[i];
-      if (!image) continue; // undefinedの場合はスキップ
+    if (isDownloadingAll) {
+      return; // 重複実行防止
+    }
+
+    try {
+      setIsDownloadingAll(true);
+      let downloadCount = 0;
+      const totalImages = state.images.length + (state.mainImage ? 1 : 0) + (state.tabImage ? 1 : 0);
       
-      await downloadImage(image.url, `stamp_${image.sequence}.png`);
+      console.log(`Starting bulk download of ${totalImages} images`);
       
-      // ダウンロード間隔を開ける（ブラウザの制限対策）
-      if (i < state.images.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+      // スタンプ画像をダウンロード
+      for (let i = 0; i < state.images.length; i++) {
+        const image = state.images[i];
+        if (!image) continue;
+        
+        try {
+          await downloadImage(image.url, `stamp_${image.sequence}.png`);
+          downloadCount++;
+          await new Promise(resolve => setTimeout(resolve, 800)); // 間隔を長く
+        } catch (error) {
+          console.error(`Failed to download stamp ${image.sequence}:`, error);
+        }
       }
+      
+      // メイン画像をダウンロード
+      if (state.mainImage) {
+        try {
+          await downloadImage(state.mainImage.url, 'main.png');
+          downloadCount++;
+          await new Promise(resolve => setTimeout(resolve, 800));
+        } catch (error) {
+          console.error('Failed to download main image:', error);
+        }
+      }
+      
+      // タブ画像をダウンロード
+      if (state.tabImage) {
+        try {
+          await downloadImage(state.tabImage.url, 'tab.png');
+          downloadCount++;
+        } catch (error) {
+          console.error('Failed to download tab image:', error);
+        }
+      }
+      
+      alert(`ダウンロード完了: ${downloadCount}/${totalImages} 枚の画像をダウンロードしました`);
+      
+    } catch (error) {
+      console.error('Bulk download error:', error);
+      alert('一括ダウンロードでエラーが発生しました');
+    } finally {
+      setIsDownloadingAll(false);
     }
   };
 
@@ -301,9 +401,14 @@ export default function PreviewPage() {
                   {state.images.length > 0 && (
                     <button
                       onClick={downloadAllImages}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                      disabled={isDownloadingAll}
+                      className={`px-4 py-2 rounded-lg transition-colors text-sm ${
+                        isDownloadingAll
+                          ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
                     >
-                      📥 全画像をダウンロード
+                      {isDownloadingAll ? '⏳ ダウンロード中...' : '📥 全画像をダウンロード'}
                     </button>
                   )}
                 </div>
@@ -330,15 +435,83 @@ export default function PreviewPage() {
                           />
                         </div>
                         <button
-                          onClick={() => downloadImage(image.url, `stamp_${image.sequence}.png`)}
-                          className="mt-2 px-3 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors"
+                          onClick={() => downloadImage(image.url, `stamp_${image.sequence}.png`, image.id)}
+                          disabled={downloadingId === image.id}
+                          className={`mt-2 px-3 py-1 rounded text-xs transition-colors ${
+                            downloadingId === image.id
+                              ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                              : 'bg-gray-600 text-white hover:bg-gray-700'
+                          }`}
                         >
-                          ⬇ ダウンロード
+                          {downloadingId === image.id ? '⏳ ダウンロード中...' : '⬇ ダウンロード'}
                         </button>
                       </div>
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* LINE用画像セクション */}
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  LINE用画像
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* メイン画像 */}
+                  {state.mainImage && (
+                    <div className="bg-gray-100 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">
+                        メイン画像 (96×74px)
+                      </h4>
+                      <div className="flex items-center justify-center h-32 bg-white rounded border-2 border-dashed border-gray-300">
+                        <img
+                          src={state.mainImage.url}
+                          alt="メイン画像"
+                          className="max-w-full max-h-full object-contain"
+                        />
+                      </div>
+                      <button
+                        onClick={() => downloadImage(state.mainImage!.url, 'main.png', `main_${state.mainImage!.id}`)}
+                        disabled={downloadingId === `main_${state.mainImage!.id}`}
+                        className={`mt-2 w-full px-3 py-1 rounded text-xs transition-colors ${
+                          downloadingId === `main_${state.mainImage!.id}`
+                            ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                            : 'bg-gray-600 text-white hover:bg-gray-700'
+                        }`}
+                      >
+                        {downloadingId === `main_${state.mainImage!.id}` ? '⏳ ダウンロード中...' : '⬇ ダウンロード'}
+                      </button>
+                    </div>
+                  )}
+                  
+                  {/* タブ画像 */}
+                  {state.tabImage && (
+                    <div className="bg-gray-100 rounded-lg p-4">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">
+                        タブ画像 (240×240px)
+                      </h4>
+                      <div className="flex items-center justify-center h-32 bg-white rounded border-2 border-dashed border-gray-300">
+                        <img
+                          src={state.tabImage.url}
+                          alt="タブ画像"
+                          className="max-w-full max-h-full object-contain"
+                        />
+                      </div>
+                      <button
+                        onClick={() => downloadImage(state.tabImage!.url, 'tab.png', `tab_${state.tabImage!.id}`)}
+                        disabled={downloadingId === `tab_${state.tabImage!.id}`}
+                        className={`mt-2 w-full px-3 py-1 rounded text-xs transition-colors ${
+                          downloadingId === `tab_${state.tabImage!.id}`
+                            ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                            : 'bg-gray-600 text-white hover:bg-gray-700'
+                        }`}
+                      >
+                        {downloadingId === `tab_${state.tabImage!.id}` ? '⏳ ダウンロード中...' : '⬇ ダウンロード'}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* エラーメッセージ */}

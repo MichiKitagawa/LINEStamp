@@ -1,7 +1,7 @@
 export interface ImageRecord {
   id: string;
   stampId: string;
-  type: 'original' | 'processed' | 'main';
+  type: 'original' | 'processed' | 'main' | 'tab';
   url: string;
   sequence: number;
   filename: string;
@@ -70,7 +70,7 @@ export interface StampRecord {
 export interface StoragePath {
   userId: string;
   stampId: string;
-  type: 'original' | 'processed';
+  type: 'original' | 'processed' | 'main' | 'tab';
   filename: string;
 }
 
